@@ -203,6 +203,17 @@ namespace Virexa.FMS
         private string notificationMessage = "";
         private float notificationTimer = 0f;
 
+        [Header("Cabin Inbound Communication Alert Popup")]
+        public bool showCabinCommsPopup = false;
+        public string popupUnitId = "";
+        public string popupSenderName = "";
+        public string popupMessageText = "";
+        public string popupTimestamp = "";
+        public bool popupIsVoice = false;
+        public bool popupIsUrgent = false;
+        public float popupTimer = 0f;
+        public const float CABIN_POPUP_DURATION = 20.0f;
+
         // Live Coordinate Info
         private string cursorUtmInfo = "Arahkan kursor ke peta";
         private double lastEasting;
@@ -1240,6 +1251,12 @@ namespace Virexa.FMS
                 if (notificationTimer <= 0f) notificationMessage = "";
             }
 
+            if (showCabinCommsPopup)
+            {
+                popupTimer -= Time.unscaledDeltaTime;
+                if (popupTimer <= 0f) showCabinCommsPopup = false;
+            }
+
             if (Camera.main == null) return;
 
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
@@ -1715,6 +1732,12 @@ namespace Virexa.FMS
 
             // 17.97 LIVE RADIO TALKBACK & INCOMING CABIN VOICE OVERLAY
             DrawLiveRadioTransmissionOverlay(w, h);
+
+            // 17.98 INCOMING CABIN COMMUNICATION & PTT POPUP (CONTROL ROOM ALERT)
+            if (showCabinCommsPopup)
+            {
+                DrawCabinCommunicationPopup(w, h);
+            }
 
             // 18. SMART COMMAND PALETTE (CTRL + K)
             if (showCommandPalette)
@@ -6274,6 +6297,123 @@ namespace Virexa.FMS
         }
 
         // =========================================================================
+        // 17.98 INCOMING CABIN COMMUNICATION & PTT POPUP (CONTROL ROOM ALERT)
+        // =========================================================================
+        public void ShowCabinCommunicationPopup(string unitId, string senderName, string body, bool isVoice, bool isUrgent)
+        {
+            popupUnitId = string.IsNullOrWhiteSpace(unitId) ? "CABIN" : unitId.Trim();
+            popupSenderName = string.IsNullOrWhiteSpace(senderName) ? $"{popupUnitId} (Operator)" : senderName;
+            popupMessageText = string.IsNullOrWhiteSpace(body) ? (isVoice ? "Transmisi suara PTT aktif" : "Pesan baru") : body;
+            popupTimestamp = DateTime.Now.ToString("HH:mm:ss");
+            popupIsVoice = isVoice;
+            popupIsUrgent = isUrgent;
+            popupTimer = CABIN_POPUP_DURATION;
+            showCabinCommsPopup = true;
+
+            // Audio Alert
+            Mobile.OperatorAudioFeedbackManager.Instance?.PlayWarningBeep();
+        }
+
+        private void DrawCabinCommunicationPopup(float screenW, float screenH)
+        {
+            float cardW = Mathf.Min(680f, screenW - 40f);
+            float cardH = 120f;
+            float cardX = (screenW - cardW) / 2f;
+            float cardY = 56f;
+
+            // Semi-transparent glassmorphic background
+            GUI.Box(new Rect(cardX, cardY, cardW, cardH), GUIContent.none, cardStyle);
+
+            // Accent Bar Top
+            Texture2D accentTex = (popupIsVoice || popupIsUrgent) ? (splashAlertBorderTex ?? lineAccentTex) : lineAccentTex;
+            if (accentTex != null)
+            {
+                GUI.DrawTexture(new Rect(cardX + 2, cardY + 2, cardW - 4, 3), accentTex);
+            }
+
+            // Pulsing Border for incoming comms
+            if (splashAlertBorderTex != null && (popupIsVoice || popupIsUrgent))
+            {
+                GUI.DrawTexture(new Rect(cardX, cardY, cardW, 2), splashAlertBorderTex);
+                GUI.DrawTexture(new Rect(cardX, cardY + cardH - 2, cardW, 2), splashAlertBorderTex);
+                GUI.DrawTexture(new Rect(cardX, cardY, 2, cardH), splashAlertBorderTex);
+                GUI.DrawTexture(new Rect(cardX + cardW - 2, cardY, 2, cardH), splashAlertBorderTex);
+            }
+
+            // Header line with glowing labels
+            string typeIcon = popupIsVoice ? "🎙️" : "📩";
+            string typeHeader = popupIsVoice ? "RADIO PTT KABIN MASUK" : (popupIsUrgent ? "PESAN DARURAT KABIN" : "KOMUNIKASI KABIN MASUK");
+            string headerColor = (popupIsVoice || popupIsUrgent) ? "#FF4D4D" : "#00E5FF";
+
+            string headerStr = $"{typeIcon} <color={headerColor}><b>[{typeHeader}]</b></color> <color=#00FFA3><b>{popupUnitId}</b></color> <color=#FFFFFF>({popupSenderName})</color> <color=#888888>[{popupTimestamp}]</color>";
+            GUI.Label(new Rect(cardX + 16, cardY + 10, cardW - 46, 22), headerStr, brandLogoStyle ?? coordStyle);
+
+            // Close (X) button
+            if (GUI.Button(new Rect(cardX + cardW - 30, cardY + 8, 22, 22), "✕", quickDockBtnStyle))
+            {
+                showCabinCommsPopup = false;
+            }
+
+            // Message content box
+            string previewBody = popupMessageText;
+            if (previewBody.Length > 95) previewBody = previewBody.Substring(0, 92) + "...";
+            GUI.Label(new Rect(cardX + 16, cardY + 36, cardW - 32, 34), $"<color=#E0E6ED>\"{previewBody}\"</color>", alertBodyStyle ?? hintStyle);
+
+            // Action Buttons Row
+            float btnY = cardY + 76;
+            float btnH = 32;
+
+            // 1. FOCUS & FOLLOW 3D CAMERA
+            if (GUI.Button(new Rect(cardX + 16, btnY, 200, btnH), "🎯 FOKUS / IKUTI UNIT (3D)", badgeSuccessBgTex != null ? badgeOfflineStyle : navBtnActiveStyle))
+            {
+                var unit = FMSFleetManager.Instance?.GetUnitById(popupUnitId);
+                if (unit != null)
+                {
+                    FMSFleetManager.Instance.SelectUnit(unit);
+                    FMSCameraController.Instance?.SetFollowTarget(unit.transform);
+                    FMSCameraController.Instance?.JumpTo(unit.transform.position, 90f);
+                    ShowNotification($"🎯 Kamera 3D Mengikuti Unit {popupUnitId}");
+                }
+                else
+                {
+                    ShowNotification($"ℹ️ Unit {popupUnitId} tidak ditemukan di pit 3D.");
+                }
+            }
+
+            // 2. OPEN DISPATCH / REPLY
+            if (GUI.Button(new Rect(cardX + 224, btnY, 190, btnH), "📻 BALAS RADIO DISPATCH", navBtnActiveStyle))
+            {
+                showDispatchRadioModal = true;
+                dispatchSelectedUnitTarget = popupUnitId;
+                showCabinCommsPopup = false;
+            }
+
+            // 3. DIRECT TALKBACK
+            bool isReplyingVoice = FMSFleetMessenger.Instance != null && FMSFleetMessenger.Instance.isTalkbackActive && FMSFleetMessenger.Instance.talkbackTargetUnit == popupUnitId;
+            string tbBtnText = isReplyingVoice ? "🔴 PUTUS TALKBACK" : "🎙️ TALKBACK SEKARANG";
+            if (GUI.Button(new Rect(cardX + 422, btnY, 175, btnH), tbBtnText, navBtnStyle))
+            {
+                if (FMSFleetMessenger.Instance != null)
+                {
+                    if (isReplyingVoice)
+                    {
+                        FMSFleetMessenger.Instance.StopTalkback();
+                    }
+                    else
+                    {
+                        FMSFleetMessenger.Instance.StartTalkback(popupUnitId);
+                    }
+                }
+            }
+
+            // 4. DISMISS BUTTON
+            if (GUI.Button(new Rect(cardX + 605, btnY, 60, btnH), "Tutup", navBtnStyle))
+            {
+                showCabinCommsPopup = false;
+            }
+        }
+
+        // =========================================================================
         // 17.9 ONBOARD UNIT LIVE CCTV STREAM MODAL / PIP
         // =========================================================================
         private void DrawUnitCctvModal(float screenW, float screenH)
@@ -6568,11 +6708,13 @@ namespace Virexa.FMS
                     GUI.DrawTexture(tagRect, bgTex);
                 }
 
-                bool isTalkbackOnUnit = FMSFleetMessenger.Instance != null && 
+                bool isCommsOnUnit = (showCabinCommsPopup && unit.unitId.Equals(popupUnitId, StringComparison.OrdinalIgnoreCase)) ||
+                    (FMSFleetMessenger.Instance != null && FMSFleetMessenger.Instance.IsUnitRecentlyCommunicating(unit.unitId));
+                bool isTalkbackOnUnit = (FMSFleetMessenger.Instance != null && 
                     ((FMSFleetMessenger.Instance.isCabinTalkbackActive && FMSFleetMessenger.Instance.cabinTalkbackSourceUnit.Equals(unit.unitId, StringComparison.OrdinalIgnoreCase)) ||
-                     (FMSFleetMessenger.Instance.isTalkbackActive && (FMSFleetMessenger.Instance.talkbackTargetUnit == "ALL" || FMSFleetMessenger.Instance.talkbackTargetUnit.Equals(unit.unitId, StringComparison.OrdinalIgnoreCase))));
+                     (FMSFleetMessenger.Instance.isTalkbackActive && (FMSFleetMessenger.Instance.talkbackTargetUnit == "ALL" || FMSFleetMessenger.Instance.talkbackTargetUnit.Equals(unit.unitId, StringComparison.OrdinalIgnoreCase))))) || isCommsOnUnit;
 
-                // 3. Draw Outer Specular Bevel Border (Red Pulsing for Talkback, Emerald for Selected, Red for Offline, Cyan for Normal)
+                // 3. Draw Outer Specular Bevel Border (Red Pulsing for Talkback/Comms, Emerald for Selected, Red for Offline, Cyan for Normal)
                 Texture2D borderTex = isTalkbackOnUnit ? (splashAlertBorderTex ?? splashGlowEmeraldTex) : (isSelected ? tagBorderSelectedTex : (isOff && !staleOff ? splashAlertBorderTex : splashGlowCyanTex));
                 if (borderTex != null)
                 {
@@ -6634,6 +6776,16 @@ namespace Virexa.FMS
                 FMSFleetManager.Instance != null && FMSFleetManager.Instance.isTelemetryFeedStale;
 
             // 0. Active Voice Radio / Talkback Status (High Priority Visual Wave)
+            if (showCabinCommsPopup && unit.unitId.Equals(popupUnitId, StringComparison.OrdinalIgnoreCase))
+            {
+                string tagIcon = popupIsVoice ? "🎙️ PTT" : "💬 PESAN";
+                parts.Add($"<color=#00FFA3><b>[{tagIcon} MASUK]</b></color>");
+            }
+            else if (FMSFleetMessenger.Instance != null && FMSFleetMessenger.Instance.IsUnitRecentlyCommunicating(unit.unitId))
+            {
+                parts.Add("<color=#00FFA3><b>[💬 COMMS]</b></color>");
+            }
+
             if (FMSFleetMessenger.Instance != null)
             {
                 if (FMSFleetMessenger.Instance.isCabinTalkbackActive && 

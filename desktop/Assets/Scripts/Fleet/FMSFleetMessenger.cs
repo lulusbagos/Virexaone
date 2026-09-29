@@ -65,11 +65,39 @@ namespace Virexa.FMS
         public string pendingRequestOperatorName = "";
         public float pendingRequestTime = 0f;
 
+        [System.Serializable]
+        public class BackendCommsMessageDto
+        {
+            public string id;
+            public string unit_name;
+            public string sender_role;
+            public string kind;
+            public string body;
+            public string priority;
+            public string sent_at;
+        }
+
+        [System.Serializable]
+        public class BackendCommsMessageListResponse
+        {
+            public string status;
+            public List<BackendCommsMessageDto> data;
+        }
+
+        private HashSet<string> knownBackendMessageIds = new HashSet<string>();
+        private bool isInitialCommsPollDone = false;
+        private Coroutine commsPollCoroutine;
+
+        // Recent Inbound Cabin Activity tracker
+        public string lastActiveCabinUnit = "";
+        public float lastActiveCabinTime = -999f;
+
         // Events & Callbacks
         public event Action<ChatMessage> OnNewMessageReceived;
         public event Action<bool, string> OnTalkbackStateChanged;
         public event Action<bool, string, string> OnCabinTalkbackStateChanged;
         public static Action<string> OnNotificationRequested;
+        public static Action<string, string, string, bool, bool> OnInboundCabinCommsReceived; // unitName, senderRole, body, isVoice, isUrgent
 
         private void Awake()
         {
@@ -77,6 +105,31 @@ namespace Virexa.FMS
             else if (Instance != this) Destroy(gameObject);
 
             SeedDefaultDemoMessages();
+        }
+
+        private void Start()
+        {
+            if (sendMessagesToBackend)
+            {
+                commsPollCoroutine = StartCoroutine(PollBackendCabinMessagesLoop());
+            }
+        }
+
+        private void OnEnable()
+        {
+            if (sendMessagesToBackend && commsPollCoroutine == null)
+            {
+                commsPollCoroutine = StartCoroutine(PollBackendCabinMessagesLoop());
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (commsPollCoroutine != null)
+            {
+                StopCoroutine(commsPollCoroutine);
+                commsPollCoroutine = null;
+            }
         }
 
         private void Update()
@@ -339,6 +392,124 @@ namespace Virexa.FMS
                 if (m.targetUnitId == "ALL" || m.targetUnitId.Equals(unitId, StringComparison.OrdinalIgnoreCase))
                 {
                     m.isRead = true;
+                }
+            }
+        }
+
+        public bool IsUnitRecentlyCommunicating(string unitId, float withinSeconds = 15f)
+        {
+            if (string.IsNullOrEmpty(unitId) || string.IsNullOrEmpty(lastActiveCabinUnit)) return false;
+            return unitId.Equals(lastActiveCabinUnit, StringComparison.OrdinalIgnoreCase) && (Time.time - lastActiveCabinTime <= withinSeconds);
+        }
+
+        /// <summary>
+        /// Periodically queries the backend comms endpoint for new messages and PTT from mobile cabin operators
+        /// </summary>
+        private IEnumerator PollBackendCabinMessagesLoop()
+        {
+            var waitInterval = new WaitForSeconds(1.5f);
+            while (true)
+            {
+                yield return waitInterval;
+
+                if (string.IsNullOrWhiteSpace(backendBaseUrl)) continue;
+
+                string url = backendBaseUrl.TrimEnd('/') + "/api/v1/comms/messages?unit_name=ALL";
+                using (var request = UnityWebRequest.Get(url))
+                {
+                    FMSApiSession.AuthorizeDispatcher(request);
+                    request.timeout = 5;
+
+                    yield return request.SendWebRequest();
+
+                    if (request.result == UnityWebRequest.Result.Success)
+                    {
+                        string json = request.downloadHandler.text;
+                        if (!string.IsNullOrWhiteSpace(json))
+                        {
+                            try
+                            {
+                                var resp = JsonUtility.FromJson<BackendCommsMessageListResponse>(json);
+                                if (resp != null && resp.data != null)
+                                {
+                                    ProcessInboundBackendMessages(resp.data);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.LogWarning($"[FMSFleetMessenger] Parse error comms: {ex.Message}");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private void ProcessInboundBackendMessages(List<BackendCommsMessageDto> incomingList)
+        {
+            if (incomingList == null) return;
+
+            if (!isInitialCommsPollDone)
+            {
+                // First poll: record initial database history so existing messages don't burst popups
+                foreach (var item in incomingList)
+                {
+                    if (!string.IsNullOrEmpty(item.id))
+                    {
+                        knownBackendMessageIds.Add(item.id);
+                    }
+                }
+                isInitialCommsPollDone = true;
+                return;
+            }
+
+            foreach (var item in incomingList)
+            {
+                if (string.IsNullOrEmpty(item.id) || knownBackendMessageIds.Contains(item.id))
+                    continue;
+
+                knownBackendMessageIds.Add(item.id);
+
+                // Only process inbound messages from cabin
+                bool isCabin = string.Equals(item.sender_role, "cabin", StringComparison.OrdinalIgnoreCase);
+                if (isCabin)
+                {
+                    string unit = string.IsNullOrWhiteSpace(item.unit_name) ? "CABIN" : item.unit_name.Trim();
+                    bool isVoice = string.Equals(item.kind, "voice", StringComparison.OrdinalIgnoreCase) || 
+                                   (item.body != null && (item.body.Contains("PTT") || item.body.Contains("Suara") || item.body.Contains("Radio")));
+                    bool isUrgent = string.Equals(item.priority, "urgent", StringComparison.OrdinalIgnoreCase) || 
+                                    string.Equals(item.priority, "emergency", StringComparison.OrdinalIgnoreCase);
+
+                    lastActiveCabinUnit = unit;
+                    lastActiveCabinTime = Time.time;
+
+                    ChatMessage chatMsg = new ChatMessage
+                    {
+                        messageId = item.id,
+                        senderName = $"{unit} (Operator)",
+                        senderRole = "OPERATOR",
+                        targetUnitId = "CONTROL_ROOM",
+                        messageText = item.body,
+                        priority = isUrgent ? MessagePriority.Urgent : MessagePriority.Normal,
+                        timestamp = DateTime.Now.ToString("HH:mm"),
+                        isRead = false,
+                        isAcknowledged = false
+                    };
+
+                    messageHistory.Add(chatMsg);
+                    unreadCabinMessagesCount++;
+                    OnNewMessageReceived?.Invoke(chatMsg);
+
+                    // Chime audio
+                    Mobile.OperatorAudioFeedbackManager.Instance?.PlayWarningBeep();
+
+                    // Fire global event & show Dashboard UI popup
+                    OnInboundCabinCommsReceived?.Invoke(unit, "OPERATOR", item.body, isVoice, isUrgent);
+
+                    if (FMSDashboardUI.Instance != null)
+                    {
+                        FMSDashboardUI.Instance.ShowCabinCommunicationPopup(unit, $"{unit} (Kabin)", item.body, isVoice, isUrgent);
+                    }
                 }
             }
         }
