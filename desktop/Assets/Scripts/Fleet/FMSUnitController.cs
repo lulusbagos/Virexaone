@@ -46,7 +46,7 @@ namespace Virexa.FMS
     public class FMSUnitController : MonoBehaviour
     {
         [Header("Unit Identity")]
-        public string unitId = "DT-101";
+        public string unitId = "RD5100";
         public long backendEquipmentId;
         public long backendEquipmentTypeId;
         public long backendStatusId;

@@ -7060,7 +7060,7 @@ namespace Virexa.FMS
 
             // Column 1
             DrawTagToggleOption(col1X, curY + 0 * rowH, colW, ref tagShowIcon, "🚚 Icon Jenis Unit", "Icon Shovel, DT, Dozer, Grader, dll.");
-            DrawTagToggleOption(col1X, curY + 1 * rowH, colW, ref tagShowName, "🏷️ Nama / ID Unit", "Nomor lambung unit (contoh: RD05 / DT-101)");
+            DrawTagToggleOption(col1X, curY + 1 * rowH, colW, ref tagShowName, "🏷️ Nama / ID Unit", "Nomor lambung unit (contoh: RD5100 / RD5091)");
             DrawTagToggleOption(col1X, curY + 2 * rowH, colW, ref tagShowSpeed, "⚡ Kecepatan Unit", "Speed real-time (contoh: 28.5 KM/Jam)");
             DrawTagToggleOption(col1X, curY + 3 * rowH, colW, ref tagShowStatus, "🚦 Status Operasional & Antrean", "Status HAUL, LOAD, DUMP, ANTRE PIT, OFF");
             DrawTagToggleOption(col1X, curY + 4 * rowH, colW, ref tagShowFtwStatus, "🩺 Status FTW SAVERA", "Status K3: 🟢 Fit / 🟡 Pengawasan / 🔴 Unfit");
