@@ -6778,7 +6778,7 @@ namespace Virexa.FMS
             // 3. DIRECT TALKBACK
             bool isReplyingVoice = FMSFleetMessenger.Instance != null && FMSFleetMessenger.Instance.isTalkbackActive && FMSFleetMessenger.Instance.talkbackTargetUnit == popupUnitId;
             string tbBtnText = isReplyingVoice ? "🔴 PUTUS TALKBACK" : "🎙️ BALAS SUARA (PTT)";
-            if (GUI.Button(new Rect(cardX + 380, btnY, 185, btnH), tbBtnText, isReplyingVoice ? (badgeWarningStyle ?? navBtnActiveStyle) : navBtnStyle))
+            if (GUI.Button(new Rect(cardX + 380, btnY, 185, btnH), tbBtnText, isReplyingVoice ? navBtnActiveStyle : navBtnStyle))
             {
                 if (FMSFleetMessenger.Instance != null)
                 {
