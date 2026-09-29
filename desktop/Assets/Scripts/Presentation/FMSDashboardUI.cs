@@ -3682,12 +3682,17 @@ namespace Virexa.FMS
                     string stateStr = unit.currentState.ToString();
                     string typeStr = unit.unitType.ToString();
 
+                    string uDigits = new string(System.Array.FindAll(uId.ToCharArray(), char.IsDigit));
+                    string qDigits = new string(System.Array.FindAll((commandPaletteQuery ?? "").ToCharArray(), char.IsDigit));
+                    bool digitMatch = !string.IsNullOrEmpty(qDigits) && qDigits.Length >= 2 && uDigits.Contains(qDigits);
+
                     bool match = string.IsNullOrEmpty(commandPaletteQuery) ||
                                  uId.IndexOf(commandPaletteQuery, StringComparison.OrdinalIgnoreCase) >= 0 ||
                                  uName.IndexOf(commandPaletteQuery, StringComparison.OrdinalIgnoreCase) >= 0 ||
                                  opr.IndexOf(commandPaletteQuery, StringComparison.OrdinalIgnoreCase) >= 0 ||
                                  typeStr.IndexOf(commandPaletteQuery, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                 stateStr.IndexOf(commandPaletteQuery, StringComparison.OrdinalIgnoreCase) >= 0;
+                                 stateStr.IndexOf(commandPaletteQuery, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                 digitMatch;
 
                     if (match)
                     {
@@ -6131,12 +6136,18 @@ namespace Virexa.FMS
 
                 var fleet = FMSFleetManager.Instance != null ? FMSFleetManager.Instance.activeFleet : null;
                 List<FMSUnitController> filteredUnits = new List<FMSUnitController>();
+                string qDigits = new string(System.Array.FindAll((dispatchUnitSearchQuery ?? "").ToCharArray(), char.IsDigit));
                 if (fleet != null)
                 {
                     foreach (var u in fleet)
                     {
                         if (u == null || string.IsNullOrEmpty(u.unitId)) continue;
-                        if (string.IsNullOrEmpty(dispatchUnitSearchQuery) || u.unitId.IndexOf(dispatchUnitSearchQuery, StringComparison.OrdinalIgnoreCase) >= 0)
+                        string uDigits = new string(System.Array.FindAll(u.unitId.ToCharArray(), char.IsDigit));
+                        bool digitMatch = !string.IsNullOrEmpty(qDigits) && qDigits.Length >= 2 && uDigits.Contains(qDigits);
+
+                        if (string.IsNullOrEmpty(dispatchUnitSearchQuery) || 
+                            u.unitId.IndexOf(dispatchUnitSearchQuery, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            digitMatch)
                             filteredUnits.Add(u);
                     }
                 }

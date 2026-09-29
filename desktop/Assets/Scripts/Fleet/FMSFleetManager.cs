@@ -739,8 +739,41 @@ namespace Virexa.FMS
 
         public FMSUnitController GetUnitById(string id)
         {
-            if (string.IsNullOrEmpty(id) || activeFleet == null) return null;
-            return activeFleet.Find(x => x != null && (x.unitId.Equals(id, StringComparison.OrdinalIgnoreCase) || (!string.IsNullOrEmpty(x.unitName) && x.unitName.Equals(id, StringComparison.OrdinalIgnoreCase))));
+            if (string.IsNullOrWhiteSpace(id) || activeFleet == null) return null;
+
+            // 1. Direct match by unitId or unitName
+            var direct = activeFleet.Find(x => x != null && 
+                ((x.unitId != null && x.unitId.Equals(id, StringComparison.OrdinalIgnoreCase)) ||
+                 (!string.IsNullOrEmpty(x.unitName) && x.unitName.Equals(id, StringComparison.OrdinalIgnoreCase))));
+            if (direct != null) return direct;
+
+            // 2. Cleaned whitespace/dash match
+            string cleanTarget = id.Replace("-", "").Replace("_", "").Replace(" ", "").Trim();
+            var cleanMatch = activeFleet.Find(x => {
+                if (x == null) return false;
+                string cUId = (x.unitId ?? "").Replace("-", "").Replace("_", "").Replace(" ", "").Trim();
+                string cUName = (x.unitName ?? "").Replace("-", "").Replace("_", "").Replace(" ", "").Trim();
+                return cUId.Equals(cleanTarget, StringComparison.OrdinalIgnoreCase) ||
+                       cUName.Equals(cleanTarget, StringComparison.OrdinalIgnoreCase);
+            });
+            if (cleanMatch != null) return cleanMatch;
+
+            // 3. Digit-based alias match (e.g. RD5107 <-> DT5107 <-> 5107)
+            string digitsTarget = new string(System.Array.FindAll(cleanTarget.ToCharArray(), char.IsDigit));
+            if (!string.IsNullOrEmpty(digitsTarget) && digitsTarget.Length >= 3)
+            {
+                var digitMatch = activeFleet.Find(x => {
+                    if (x == null) return false;
+                    string cUId = x.unitId ?? "";
+                    string cUName = x.unitName ?? "";
+                    string digitsU = new string(System.Array.FindAll(cUId.ToCharArray(), char.IsDigit));
+                    if (string.IsNullOrEmpty(digitsU)) digitsU = new string(System.Array.FindAll(cUName.ToCharArray(), char.IsDigit));
+                    return digitsU == digitsTarget;
+                });
+                if (digitMatch != null) return digitMatch;
+            }
+
+            return null;
         }
 
         public void SelectUnitById(string id)
