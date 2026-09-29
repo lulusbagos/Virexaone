@@ -570,7 +570,7 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
           width: 38,
           height: 38,
           child: IconButton.filled(
-            tooltip: 'Kirim Pesan',
+            
             onPressed: busy ? null : () => send(),
             style: IconButton.styleFrom(
               backgroundColor: FmsTheme.cyanAccent,

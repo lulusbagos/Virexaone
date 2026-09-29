@@ -6703,8 +6703,8 @@ namespace Virexa.FMS
 
         private void DrawCabinCommunicationPopup(float screenW, float screenH)
         {
-            float cardW = Mathf.Min(680f, screenW - 40f);
-            float cardH = 120f;
+            float cardW = Mathf.Min(720f, screenW - 40f);
+            float cardH = 126f;
             float cardX = (screenW - cardW) / 2f;
             float cardY = 56f;
 
@@ -6728,38 +6728,38 @@ namespace Virexa.FMS
             }
 
             // Header line with glowing labels
-            string typeIcon = popupIsVoice ? "🎙️" : "📩";
-            string typeHeader = popupIsVoice ? "RADIO PTT KABIN MASUK" : (popupIsUrgent ? "PESAN DARURAT KABIN" : "KOMUNIKASI KABIN MASUK");
+            string typeIcon = popupIsVoice ? "🎙️" : (popupIsUrgent ? "🚨" : "📩");
+            string typeHeader = popupIsVoice ? "RADIO PTT KABIN MASUK" : (popupIsUrgent ? "PESAN DARURAT KABIN" : "PESAN KABIN MASUK");
             string headerColor = (popupIsVoice || popupIsUrgent) ? "#FF4D4D" : "#00E5FF";
 
-            string headerStr = $"{typeIcon} <color={headerColor}><b>[{typeHeader}]</b></color> <color=#00FFA3><b>{popupUnitId}</b></color> <color=#FFFFFF>({popupSenderName})</color> <color=#888888>[{popupTimestamp}]</color>";
+            string headerStr = $"{typeIcon} <color={headerColor}><b>[{typeHeader}]</b></color>  Unit: <color=#00FFA3><b>{popupUnitId}</b></color>  |  Operator: <color=#FFFFFF><b>{popupSenderName}</b></color>  <color=#8899A6>[{popupTimestamp}]</color>";
             GUI.Label(new Rect(cardX + 16, cardY + 10, cardW - 46, 22), headerStr, brandLogoStyle ?? coordStyle);
 
             // Close (X) button
-            if (GUI.Button(new Rect(cardX + cardW - 30, cardY + 8, 22, 22), "✕", quickDockBtnStyle))
+            if (GUI.Button(new Rect(cardX + cardW - 32, cardY + 8, 24, 22), "✕", quickDockBtnStyle))
             {
                 showCabinCommsPopup = false;
             }
 
             // Message content box
             string previewBody = popupMessageText;
-            if (previewBody.Length > 95) previewBody = previewBody.Substring(0, 92) + "...";
-            GUI.Label(new Rect(cardX + 16, cardY + 36, cardW - 32, 34), $"<color=#E0E6ED>\"{previewBody}\"</color>", alertBodyStyle ?? hintStyle);
+            if (previewBody.Length > 110) previewBody = previewBody.Substring(0, 107) + "...";
+            GUI.Label(new Rect(cardX + 16, cardY + 36, cardW - 32, 34), $"<color=#00E5FF><b>Pesan:</b></color> <color=#FFFFFF>\"{previewBody}\"</color>", alertBodyStyle ?? hintStyle);
 
             // Action Buttons Row
-            float btnY = cardY + 76;
-            float btnH = 32;
+            float btnY = cardY + 78;
+            float btnH = 34;
 
-            // 1. FOCUS & FOLLOW 3D CAMERA
-            if (GUI.Button(new Rect(cardX + 16, btnY, 200, btnH), "🎯 FOKUS / IKUTI UNIT (3D)", badgeSuccessBgTex != null ? badgeOfflineStyle : navBtnActiveStyle))
+            // 1. OPTIONAL VIEW / FOCUS 3D UNIT CAMERA
+            if (GUI.Button(new Rect(cardX + 16, btnY, 175, btnH), "👁️ LIHAT / SOROT UNIT", navBtnActiveStyle))
             {
                 var unit = FMSFleetManager.Instance?.GetUnitById(popupUnitId);
                 if (unit != null)
                 {
                     FMSFleetManager.Instance.SelectUnit(unit);
                     FMSCameraController.Instance?.SetFollowTarget(unit.transform);
-                    FMSCameraController.Instance?.JumpTo(unit.transform.position, 90f);
-                    ShowNotification($"🎯 Kamera 3D Mengikuti Unit {popupUnitId}");
+                    FMSCameraController.Instance?.JumpTo(unit.transform.position, 85f);
+                    ShowNotification($"🎯 Kamera 3D Menyorot Unit {popupUnitId}");
                 }
                 else
                 {
@@ -6767,8 +6767,8 @@ namespace Virexa.FMS
                 }
             }
 
-            // 2. OPEN DISPATCH / REPLY
-            if (GUI.Button(new Rect(cardX + 224, btnY, 190, btnH), "📻 BALAS RADIO DISPATCH", navBtnActiveStyle))
+            // 2. OPEN DISPATCH / REPLY CHAT
+            if (GUI.Button(new Rect(cardX + 198, btnY, 175, btnH), "💬 BALAS PESAN / CHAT", navBtnStyle))
             {
                 showDispatchRadioModal = true;
                 dispatchSelectedUnitTarget = popupUnitId;
@@ -6777,8 +6777,8 @@ namespace Virexa.FMS
 
             // 3. DIRECT TALKBACK
             bool isReplyingVoice = FMSFleetMessenger.Instance != null && FMSFleetMessenger.Instance.isTalkbackActive && FMSFleetMessenger.Instance.talkbackTargetUnit == popupUnitId;
-            string tbBtnText = isReplyingVoice ? "🔴 PUTUS TALKBACK" : "🎙️ TALKBACK SEKARANG";
-            if (GUI.Button(new Rect(cardX + 422, btnY, 175, btnH), tbBtnText, navBtnStyle))
+            string tbBtnText = isReplyingVoice ? "🔴 PUTUS TALKBACK" : "🎙️ BALAS SUARA (PTT)";
+            if (GUI.Button(new Rect(cardX + 380, btnY, 185, btnH), tbBtnText, isReplyingVoice ? (badgeWarningStyle ?? navBtnActiveStyle) : navBtnStyle))
             {
                 if (FMSFleetMessenger.Instance != null)
                 {
@@ -6794,7 +6794,7 @@ namespace Virexa.FMS
             }
 
             // 4. DISMISS BUTTON
-            if (GUI.Button(new Rect(cardX + 605, btnY, 60, btnH), "Tutup", navBtnStyle))
+            if (GUI.Button(new Rect(cardX + 572, btnY, cardW - 588, btnH), "TUTUP", quickDockBtnStyle))
             {
                 showCabinCommsPopup = false;
             }

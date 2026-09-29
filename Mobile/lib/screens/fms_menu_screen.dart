@@ -53,43 +53,53 @@ class _FmsMenuScreenState extends State<FmsMenuScreen> {
         borderRadius: BorderRadius.circular(6),
         side: const BorderSide(color: FmsTheme.cardBorder),
       ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1100, maxHeight: 680),
-        child: AnimatedBuilder(
-          animation: api,
-          builder: (context, _) => Column(
-            children: [
-              _header(),
-              const Divider(height: 1, color: FmsTheme.cardBorder),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, size) => size.maxWidth < 650
-                      ? Column(
-                          children: [
-                            SizedBox(
-                              height: 56,
-                              child: _tabs(horizontal: true),
-                            ),
-                            Expanded(child: _content()),
-                          ],
-                        )
-                      : Row(
-                          children: [
-                            SizedBox(
-                              width: 190,
-                              child: _tabs(horizontal: false),
-                            ),
-                            const VerticalDivider(
-                              width: 1,
-                              color: FmsTheme.cardBorder,
-                            ),
-                            Expanded(child: _content()),
-                          ],
+      child: Material(
+        color: FmsTheme.bgDark,
+        borderRadius: BorderRadius.circular(6),
+        child: Overlay(
+          initialEntries: [
+            OverlayEntry(
+              builder: (overlayContext) => ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1100, maxHeight: 680),
+                child: AnimatedBuilder(
+                  animation: api,
+                  builder: (context, _) => Column(
+                    children: [
+                      _header(),
+                      const Divider(height: 1, color: FmsTheme.cardBorder),
+                      Expanded(
+                        child: LayoutBuilder(
+                          builder: (context, size) => size.maxWidth < 650
+                              ? Column(
+                                  children: [
+                                    SizedBox(
+                                      height: 56,
+                                      child: _tabs(horizontal: true),
+                                    ),
+                                    Expanded(child: _content()),
+                                  ],
+                                )
+                              : Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 190,
+                                      child: _tabs(horizontal: false),
+                                    ),
+                                    const VerticalDivider(
+                                      width: 1,
+                                      color: FmsTheme.cardBorder,
+                                    ),
+                                    Expanded(child: _content()),
+                                  ],
+                                ),
                         ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

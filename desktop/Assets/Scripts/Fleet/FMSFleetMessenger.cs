@@ -75,7 +75,7 @@ namespace Virexa.FMS
         [Header("Control Room Communication Policy")]
         public InboundCommsPolicy commsPolicy = InboundCommsPolicy.OpenDirect;
         public NotificationFilterLevel notificationFilter = NotificationFilterLevel.AllMessagesAndVoice;
-        public bool autoFollowCameraOnIncomingComms = true;
+        public bool autoFollowCameraOnIncomingComms = false;
 
         [Header("Request-To-Talk Queue (Pending Authorization)")]
         public bool hasPendingTalkbackRequest = false;
