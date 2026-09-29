@@ -75,3 +75,5 @@ desktop.ini
 
 publish/
 
+Mobile/android/build/
+**/android/build/

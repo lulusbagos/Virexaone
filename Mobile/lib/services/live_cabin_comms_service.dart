@@ -81,7 +81,7 @@ class LiveCabinCommsService extends ChangeNotifier {
       }
       final ticket = (jsonDecode(response.body) as Map)['ticket']?.toString();
       if (ticket == null || generation != _generation) return;
-      final wsBase = _baseUrl.replaceFirst(RegExp(r'^https:'), 'wss:');
+      final wsBase = _baseUrl.replaceFirst(RegExp(r'^https:'), 'wss:').replaceFirst(RegExp(r'^http:'), 'ws:');
       final channel = IOWebSocketChannel.connect(
         '$wsBase/api/v1/comms/live?ticket=${Uri.encodeQueryComponent(ticket)}',
         pingInterval: const Duration(seconds: 20),

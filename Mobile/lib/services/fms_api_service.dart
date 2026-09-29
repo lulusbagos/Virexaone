@@ -84,7 +84,7 @@ class FmsApiService extends ChangeNotifier {
       'astha-local-dispatcher-key-2026-09';
   factory FmsApiService() => _instance;
   FmsApiService._internal();
-  String backendBaseUrl = 'http://172.16.1.92:8000';
+  String backendBaseUrl = 'http://127.0.0.1:8000';
   bool isApiConnected = false, isLoggedIn = false;
   String apiStatusMessage = 'Menghubungkan ke FMS...';
   DateTime? lastApiSyncTime;
