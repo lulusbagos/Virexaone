@@ -62,7 +62,7 @@ namespace Virexa.FMS.Mobile
         {
             string nik = PlayerPrefs.GetString(PREF_KEY_OPERATOR_NIK, "OP-98241");
             string name = PlayerPrefs.GetString(PREF_KEY_OPERATOR_NAME, "Budi Pratama");
-            string unitId = PlayerPrefs.GetString(PREF_KEY_SAVED_UNIT, "DT-104");
+            string unitId = PlayerPrefs.GetString(PREF_KEY_SAVED_UNIT, "RD5104");
             return (nik, name, unitId);
         }
 

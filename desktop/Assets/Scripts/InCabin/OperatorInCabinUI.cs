@@ -27,7 +27,7 @@ namespace Virexa.FMS.Mobile
         public string operatorName = "Budi Santoso";
         public string operatorPin = "";
         public string defaultPin = "1234";
-        public string selectedUnitId = "DT-105";
+        public string selectedUnitId = "RD5105";
         public string selectedUnitModel = "CAT 777E (Off-Highway Truck)";
         public string selectedLocation = "Pit B Selatan";
         public string selectedShift = "Shift 1 (Pagi)";
@@ -570,7 +570,7 @@ namespace Virexa.FMS.Mobile
                 }
             }
 
-            // Draw Truck Dot (DT-105) and Shovel Dot (EX-012)
+            // Draw Truck Dot (RD5105) and Shovel Dot (EX-012)
             int tx = 102, ty = 68;
             int sx = 46, sy = 40;
             for (int dy = -4; dy <= 4; dy++)
@@ -776,7 +776,7 @@ namespace Virexa.FMS.Mobile
 
         public void BindToUnit(string unitId)
         {
-            selectedUnitId = string.IsNullOrEmpty(unitId) ? "DT-105" : unitId;
+            selectedUnitId = string.IsNullOrEmpty(unitId) ? "RD5105" : unitId;
             selectedUnitModel = "CAT 777E (Off-Highway Truck)";
             selectedLocation = "Pit B Selatan";
             activeAssignedLoader = "EXCAVATOR-012";

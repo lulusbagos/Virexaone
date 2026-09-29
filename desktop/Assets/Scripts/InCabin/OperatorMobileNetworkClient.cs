@@ -59,7 +59,7 @@ namespace Virexa.FMS.Mobile
             {
                 for (int i = 1; i <= 18; i++)
                 {
-                    availableUnitIds.Add($"DT-{100 + i}");
+                    availableUnitIds.Add($"RD{5000 + i}");
                 }
             }
         }

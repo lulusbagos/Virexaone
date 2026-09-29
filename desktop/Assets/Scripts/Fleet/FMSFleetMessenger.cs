@@ -27,9 +27,9 @@ namespace Virexa.FMS
         public class ChatMessage
         {
             public string messageId;
-            public string senderName;       // "Control Room (Dispatcher)" or "DT-104 (Budi Pratama)"
+            public string senderName;       // "Control Room (Dispatcher)" or "RD5104 (Budi Pratama)"
             public string senderRole;       // "DISPATCHER" / "OPERATOR"
-            public string targetUnitId;     // "ALL" (Broadcast) or specific "DT-104"
+            public string targetUnitId;     // "ALL" (Broadcast) or specific "RD5104"
             public string messageText;
             public MessagePriority priority;
             public string timestamp;

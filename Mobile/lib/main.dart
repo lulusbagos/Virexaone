@@ -4,18 +4,20 @@ import 'package:flutter/services.dart';
 import 'theme/fms_theme.dart';
 import 'services/fms_api_service.dart';
 import 'services/live_cabin_comms_service.dart';
-import 'screens/login_screen.dart';
-import 'screens/cabin_dashboard_screen.dart';
+import 'screens/splash_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // Lock landscape orientation for authentic in-cabin tablet cockpit experience
+
+  // Support both portrait and landscape modes dynamically
   SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
     DeviceOrientation.landscapeLeft,
     DeviceOrientation.landscapeRight,
   ]);
 
-  // Hide system status bar for immersive full-screen FMS cockpit
+  // Keep system UI clean and sticky immersive
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
   FmsApiService().init();
@@ -29,7 +31,7 @@ class VirexaCabinApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Virexa FMS In-Cabin Mobile',
+      title: 'Virexa One FMS',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
@@ -51,19 +53,20 @@ class VirexaCabinApp extends StatelessWidget {
               navigator ?? const SizedBox.shrink(),
               if (alert != null)
                 Positioned(
-                  top: 20,
-                  left: 20,
-                  right: 20,
+                  top: 24,
+                  left: 16,
+                  right: 16,
                   child: Center(
                     child: Material(
                       color: alert.urgent
-                          ? const Color(0xFF3A2023)
-                          : const Color(0xFF10282A),
+                          ? const Color(0xF03B151A)
+                          : const Color(0xF0092233),
                       elevation: 16,
+                      borderRadius: BorderRadius.circular(12),
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 560),
+                        constraints: const BoxConstraints(maxWidth: 580),
                         child: Container(
-                          padding: const EdgeInsets.fromLTRB(16, 11, 6, 11),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
                           decoration: BoxDecoration(
                             border: Border.all(
                               color: alert.urgent
@@ -71,18 +74,26 @@ class VirexaCabinApp extends StatelessWidget {
                                   : FmsTheme.emeraldGreen,
                               width: 2,
                             ),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: FmsTheme.neonGlowShadow(
+                              alert.urgent
+                                  ? FmsTheme.redHazard
+                                  : FmsTheme.emeraldGreen,
+                              opacity: 0.4,
+                            ),
                           ),
                           child: Row(
                             children: [
                               Icon(
                                 alert.voice
-                                    ? Icons.record_voice_over
-                                    : Icons.mark_chat_unread,
+                                    ? Icons.record_voice_over_rounded
+                                    : Icons.mark_chat_unread_rounded,
                                 color: alert.urgent
                                     ? FmsTheme.redHazard
                                     : FmsTheme.emeraldGreen,
+                                size: 28,
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 14),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,13 +102,21 @@ class VirexaCabinApp extends StatelessWidget {
                                     Text(
                                       alert.title,
                                       style: FmsTheme.titleMedium.copyWith(
-                                        fontSize: 14,
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: alert.urgent
+                                            ? FmsTheme.redHazard
+                                            : FmsTheme.emeraldGreen,
                                       ),
                                     ),
                                     const SizedBox(height: 3),
                                     Text(
                                       alert.body,
-                                      style: FmsTheme.bodyNormal,
+                                      style: FmsTheme.bodyNormal.copyWith(
+                                        fontSize: 12.5,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                       maxLines: 3,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -107,7 +126,7 @@ class VirexaCabinApp extends StatelessWidget {
                               IconButton(
                                 tooltip: 'Tutup pemberitahuan',
                                 onPressed: live.dismissAlert,
-                                icon: const Icon(Icons.close),
+                                icon: const Icon(Icons.close_rounded, size: 20),
                               ),
                             ],
                           ),
@@ -120,47 +139,7 @@ class VirexaCabinApp extends StatelessWidget {
           );
         },
       ),
-      home: const MainCabinNavigator(),
+      home: const SplashScreen(),
     );
-  }
-}
-
-class MainCabinNavigator extends StatefulWidget {
-  const MainCabinNavigator({super.key});
-
-  @override
-  State<MainCabinNavigator> createState() => _MainCabinNavigatorState();
-}
-
-class _MainCabinNavigatorState extends State<MainCabinNavigator> {
-  final FmsApiService _api = FmsApiService();
-
-  @override
-  void initState() {
-    super.initState();
-    _api.addListener(_onStateChanged);
-  }
-
-  void _onStateChanged() {
-    if (mounted) setState(() {});
-  }
-
-  @override
-  void dispose() {
-    _api.removeListener(_onStateChanged);
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!_api.isLoggedIn) {
-      return LoginScreen(
-        onLoginSuccess: () {
-          setState(() {});
-        },
-      );
-    }
-
-    return const CabinDashboardScreen();
   }
 }
