@@ -700,7 +700,7 @@ class FmsApiService extends ChangeNotifier {
         !haulerUnits.any((u) => u.unitName == unitId && u.hasFreshGps)) {
       return false;
     }
-    _ensureCabinCommsPairing(unitId);
+    ensureCabinCommsPairing(unitId);
     if (selectedUnitId != unitId) _resetNavigationCache();
     selectedUnitId = unitId;
     hexagonUnitData = null;
@@ -719,16 +719,18 @@ class FmsApiService extends ChangeNotifier {
     return true;
   }
 
-  Future<void> _ensureCabinCommsPairing(String unitId) async {
+  Future<String?> ensureCabinCommsPairing([String? targetUnit]) async {
+    final unitId = (targetUnit ?? selectedUnitId).trim();
+    if (unitId.isEmpty) return null;
     final existing = cabinCommsKeys[unitId];
     if (existing != null && existing.isNotEmpty) {
       await LiveCabinCommsService().connect(backendBaseUrl, unitId, existing);
-      return;
+      return existing;
     }
     try {
       final response = await http
           .post(
-            Uri.parse('$backendBaseUrl/api/v1/comms/pair'),
+            Uri.parse('/api/v1/comms/pair'),
             headers: {
               'X-FMS-Dispatcher-Key': _localDispatcherKey,
               'Content-Type': 'application/json',
@@ -738,16 +740,18 @@ class FmsApiService extends ChangeNotifier {
           .timeout(const Duration(seconds: 8));
       if (response.statusCode != 200) {
         LiveCabinCommsService().disconnect();
-        return;
+        return null;
       }
       final decoded = jsonDecode(response.body);
-      if (decoded is! Map<String, dynamic>) return;
+      if (decoded is! Map<String, dynamic>) return null;
       final token = decoded['token']?.toString();
-      if (token == null || token.isEmpty) return;
+      if (token == null || token.isEmpty) return null;
       cabinCommsKeys[unitId] = token;
       await LiveCabinCommsService().connect(backendBaseUrl, unitId, token);
+      return token;
     } catch (_) {
       LiveCabinCommsService().disconnect();
+      return null;
     }
   }
 

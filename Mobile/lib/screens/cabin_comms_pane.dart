@@ -18,7 +18,6 @@ class CabinCommsPane extends StatefulWidget {
 class _CabinCommsPaneState extends State<CabinCommsPane>
     with SingleTickerProviderStateMixin {
   final api = FmsApiService();
-  final tokenInput = TextEditingController();
   final messageInput = TextEditingController();
   final scrollController = ScrollController();
   final live = LiveCabinCommsService();
@@ -26,23 +25,24 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
   Timer? poll;
   String? unitKey;
   String? boundUnit;
-  String status = 'Memeriksa layanan komunikasi...';
+  String status = 'Menghubungkan otomatis ke Ruang Kontrol...';
   bool serviceEnabled = false;
   bool busy = false;
+  bool isAutoPairing = false;
   List<Map<String, dynamic>> messages = [];
 
-  final List<String> quickPresets = [
-    'Siap Muat',
-    'Menuju Front Gali',
-    'Antre Disposal',
-    'Selesai Dumping',
-    'Perlu Fuel / Refuel',
-    'Kendala Jalan / Breakdown',
-    'Minta Arahan Dispatcher',
+  final List<Map<String, dynamic>> quickPresets = [
+    {'icon': '🚜', 'label': 'SIAP MUAT', 'text': 'Unit siap muat di Front'},
+    {'icon': '🚛', 'label': 'MENUJU FRONT', 'text': 'Sedang traveling menuju Front Gali'},
+    {'icon': '🛑', 'label': 'ANTRE DISPOSAL', 'text': 'Antre dumping di Disposal'},
+    {'icon': '📦', 'label': 'SELESAI DUMP', 'text': 'Selesai dumping, kembali ke front'},
+    {'icon': '⛽', 'label': 'PERLU FUEL', 'text': 'Bahan bakar menipis, butuh fuel truck'},
+    {'icon': '⚠️', 'label': 'KENDALA JALAN', 'text': 'Ada hazard / kendala di jalur hauling'},
+    {'icon': '📢', 'label': 'MINTA ASSIGNMENT', 'text': 'Mohon konfirmasi assignment baru'},
   ];
 
   Uri endpoint(String path, [Map<String, String>? query]) => Uri.parse(
-    '/api/v1/comms/',
+    '${api.backendBaseUrl.replaceAll(RegExp(r'/+$'), '')}/api/v1/comms/$path',
   ).replace(queryParameters: query);
 
   @override
@@ -50,21 +50,19 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
     super.initState();
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1000),
     )..repeat(reverse: true);
 
-    unitKey = api.cabinCommsKeys[api.selectedUnitId];
-    if (unitKey != null) boundUnit = api.selectedUnitId;
     live.addListener(_onLiveChanged);
-    checkStatus();
-    poll = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (!serviceEnabled) checkStatus();
-      refresh();
+    _initAutoConnection();
+
+    poll = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!serviceEnabled || unitKey == null) {
+        _initAutoConnection();
+      } else {
+        refresh();
+      }
     });
-    if (unitKey != null) {
-      live.connect(api.backendBaseUrl, boundUnit!, unitKey!);
-      refresh();
-    }
   }
 
   void _onLiveChanged() {
@@ -75,11 +73,40 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
   void dispose() {
     poll?.cancel();
     _pulseController.dispose();
-    tokenInput.dispose();
     messageInput.dispose();
     scrollController.dispose();
     live.removeListener(_onLiveChanged);
     super.dispose();
+  }
+
+  Future<void> _initAutoConnection() async {
+    final unit = api.selectedUnitId.isEmpty ? 'RD5100' : api.selectedUnitId;
+    if (isAutoPairing) return;
+    isAutoPairing = true;
+    try {
+      final key = await api.ensureCabinCommsPairing(unit);
+      if (!mounted) return;
+      if (key != null && key.isNotEmpty) {
+        setState(() {
+          unitKey = key;
+          boundUnit = unit;
+          serviceEnabled = true;
+          status = 'Radio & Pesan Terhubung';
+        });
+        await refresh();
+      } else {
+        setState(() {
+          serviceEnabled = false;
+          status = 'Mencoba menghubungkan ke server FMS...';
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => status = 'Menghubungkan ulang...');
+      }
+    } finally {
+      isAutoPairing = false;
+    }
   }
 
   void _scrollToBottom() {
@@ -87,141 +114,46 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
       if (scrollController.hasClients) {
         scrollController.animateTo(
           scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
+          duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
         );
       }
     });
   }
 
-  Future<void> checkStatus() async {
-    try {
-      final response = await http
-          .get(endpoint('status'))
-          .timeout(const Duration(seconds: 8));
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (!mounted) return;
-      setState(() {
-        serviceEnabled = response.statusCode == 200 && data['enabled'] == true;
-        status = serviceEnabled
-            ? unitKey == null
-                ? 'Masukkan kode pasangan untuk .'
-                : 'Menghubungkan pesan untuk ...'
-            : 'Layanan pesan belum diaktifkan pada server.';
-      });
-    } catch (_) {
-      if (mounted) {
-        setState(
-          () => status = 'Layanan pesan belum tersedia pada server ini.',
-        );
-      }
-    }
-  }
-
-  Future<void> connect() async {
-    final key = tokenInput.text.trim();
-    final unit = api.selectedUnitId;
-    if (key.isEmpty || unit.isEmpty) return;
-    setState(() => busy = true);
-    try {
-      final response = await http
-          .get(
-            endpoint('messages', {'unit_name': unit}),
-            headers: {'X-FMS-Unit-Key': key},
-          )
-          .timeout(const Duration(seconds: 8));
-      if (response.statusCode != 200) {
-        throw Exception('Kode pasangan tidak valid ().');
-      }
-      if (!mounted) return;
-      setState(() {
-        unitKey = key;
-        boundUnit = unit;
-        api.cabinCommsKeys[unit] = key;
-        tokenInput.clear();
-        status = 'Terhubung ke ruang kontrol';
-        messages = (jsonDecode(response.body)['data'] as List)
-            .map((item) => Map<String, dynamic>.from(item as Map))
-            .toList();
-      });
-      _scrollToBottom();
-      await live.connect(api.backendBaseUrl, unit, key);
-    } catch (error) {
-      if (mounted) {
-        setState(
-          () => status = error.toString().replaceFirst('Exception: ', ''),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => busy = false);
-    }
-  }
-
   Future<void> refresh() async {
     final key = unitKey;
-    final unit = boundUnit;
-    if (!mounted || key == null || unit == null) return;
-    if (api.selectedUnitId != unit) {
-      setState(() {
-        live.disconnect();
-        unitKey = null;
-        boundUnit = null;
-        unitKey = api.cabinCommsKeys[api.selectedUnitId];
-        if (unitKey != null) boundUnit = api.selectedUnitId;
-        messages = [];
-        status = unitKey == null
-            ? 'Unit berubah. Masukkan kode pasangan unit baru.'
-            : 'Menghubungkan pesan untuk ...';
-      });
-      if (unitKey != null) {
-        live.connect(api.backendBaseUrl, boundUnit!, unitKey!);
-      }
-      return;
-    }
+    final unit = boundUnit ?? api.selectedUnitId;
+    if (!mounted || key == null || unit.isEmpty) return;
+
     try {
       final response = await http
           .get(
             endpoint('messages', {'unit_name': unit}),
             headers: {'X-FMS-Unit-Key': key},
           )
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 6));
       if (!mounted) return;
-      if (response.statusCode == 403) {
-        setState(() {
-          live.disconnect();
-          unitKey = null;
-          boundUnit = null;
-          api.cabinCommsKeys.remove(unit);
-          messages = [];
-          status = 'Kode pasangan dicabut. Hubungkan ulang.';
-        });
-      } else if (response.statusCode == 200) {
+      if (response.statusCode == 200) {
         final newMsgs = (jsonDecode(response.body)['data'] as List)
             .map((item) => Map<String, dynamic>.from(item as Map))
             .toList();
         final hadMore = newMsgs.length > messages.length;
         setState(() {
           messages = newMsgs;
-          status = 'Terhubung ke ruang kontrol';
+          serviceEnabled = true;
+          status = 'Terhubung ke Ruang Kontrol';
         });
         if (hadMore) _scrollToBottom();
-      } else {
-        setState(
-          () => status = 'Sinkronisasi pesan gagal ().',
-        );
       }
-    } catch (_) {
-      if (mounted) {
-        setState(() => status = 'Koneksi pesan terputus. Mencoba kembali...');
-      }
-    }
+    } catch (_) {}
   }
 
   Future<void> send([String? textOverride]) async {
     final key = unitKey;
-    final unit = boundUnit;
+    final unit = boundUnit ?? api.selectedUnitId;
     final body = (textOverride ?? messageInput.text).trim();
-    if (key == null || unit == null || body.isEmpty || busy) return;
+    if (key == null || unit.isEmpty || body.isEmpty || busy) return;
     setState(() => busy = true);
     try {
       final response = await http
@@ -237,12 +169,11 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
               'priority': 'normal',
             }),
           )
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode != 200) {
-        throw Exception('Pesan gagal terkirim ().');
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        if (textOverride == null) messageInput.clear();
+        await refresh();
       }
-      if (textOverride == null) messageInput.clear();
-      await refresh();
     } catch (error) {
       if (mounted) {
         setState(
@@ -256,398 +187,416 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
 
   @override
   Widget build(BuildContext context) {
+    final activeUnit = api.selectedUnitId.isEmpty ? 'KABIN' : api.selectedUnitId;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Top Header Info
+        // 1. Live Radio & Comms Status Banner
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: FmsTheme.cardHeaderBg,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: live.connected
-                  ? FmsTheme.emeraldGreen.withValues(alpha: 0.5)
-                  : FmsTheme.amberWarning.withValues(alpha: 0.4),
+                  ? FmsTheme.emeraldGreen.withValues(alpha: 0.7)
+                  : FmsTheme.amberWarning.withValues(alpha: 0.6),
+              width: 1.2,
             ),
+            boxShadow: live.connected
+                ? FmsTheme.neonGlowShadow(FmsTheme.emeraldGreen, opacity: 0.25)
+                : null,
           ),
           child: Row(
             children: [
-              Icon(
-                live.connected ? Icons.radio : Icons.radio_button_off,
-                size: 16,
-                color: live.connected
-                    ? FmsTheme.emeraldGreen
-                    : FmsTheme.amberWarning,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  unitKey == null ? status : '  |  ',
-                  style: FmsTheme.caption.copyWith(
-                    color: serviceEnabled && unitKey != null
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: live.connected
+                      ? FmsTheme.emeraldGreen
+                      : FmsTheme.amberWarning,
+                  boxShadow: FmsTheme.neonGlowShadow(
+                    live.connected
                         ? FmsTheme.emeraldGreen
                         : FmsTheme.amberWarning,
-                    fontWeight: FontWeight.w600,
+                    opacity: 0.8,
+                    blur: 6,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'KOMUNIKASI KABIN / $activeUnit',
+                      style: FmsTheme.titleMedium.copyWith(
+                        color: FmsTheme.emeraldGreen,
+                        fontSize: 12,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    Text(
+                      live.connected
+                          ? 'Radio PTT & Pesan Terhubung Langsung'
+                          : status,
+                      style: FmsTheme.caption.copyWith(
+                        color: live.connected
+                            ? FmsTheme.textLight
+                            : FmsTheme.amberWarning,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Segarkan',
+                icon: const Icon(Icons.refresh, size: 18, color: FmsTheme.cyanAccent),
+                onPressed: () {
+                  _initAutoConnection();
+                  refresh();
+                },
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
             ],
           ),
         ),
         const SizedBox(height: 8),
 
-        // Body Content
-        if (!serviceEnabled)
-          Expanded(
-            child: Center(
-              child: OutlinedButton.icon(
-                onPressed: checkStatus,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Coba lagi'),
-              ),
-            ),
-          )
-        else if (unitKey == null) ...[
-          Expanded(
-            child: Center(
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 380),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: FmsTheme.cardBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: FmsTheme.cardBorder),
+        // 2. Main Messages Thread Viewport (High-Contrast & Operator Friendly)
+        Expanded(
+          child: messages.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.speaker_notes_outlined,
+                        size: 40,
+                        color: FmsTheme.cyanAccent.withValues(alpha: 0.4),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Belum ada pesan masuk.',
+                        style: FmsTheme.titleMedium.copyWith(
+                          color: FmsTheme.textLight,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Pesan dari kontrol atau kiriman kabin akan tampil di sini.',
+                        style: FmsTheme.caption,
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    final item = messages[index];
+                    final fromDispatch = item['sender_role'] == 'dispatcher';
+                    final voice = item['kind'] == 'voice';
+                    final priority = item['priority']?.toString();
+                    final isUrgent = priority == 'urgent';
+
+                    return Align(
+                      alignment: fromDispatch
+                          ? Alignment.centerLeft
+                          : Alignment.centerRight,
+                      child: Container(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.sizeOf(context).width * 0.82,
+                        ),
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          gradient: fromDispatch
+                              ? const LinearGradient(
+                                  colors: [Color(0xF50D243A), Color(0xF5071424)],
+                                )
+                              : const LinearGradient(
+                                  colors: [Color(0xF50A3324), Color(0xF5041A12)],
+                                ),
+                          border: Border.all(
+                            color: isUrgent
+                                ? FmsTheme.redHazard
+                                : fromDispatch
+                                    ? FmsTheme.cyanAccent.withValues(alpha: 0.75)
+                                    : FmsTheme.emeraldGreen.withValues(alpha: 0.75),
+                            width: isUrgent ? 2.0 : 1.2,
+                          ),
+                          borderRadius: BorderRadius.only(
+                            topLeft: const Radius.circular(12),
+                            topRight: const Radius.circular(12),
+                            bottomLeft: Radius.circular(fromDispatch ? 2 : 12),
+                            bottomRight: Radius.circular(fromDispatch ? 12 : 2),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: (fromDispatch
+                                      ? FmsTheme.cyanAccent
+                                      : FmsTheme.emeraldGreen)
+                                  .withValues(alpha: 0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  fromDispatch
+                                      ? Icons.headset_mic_rounded
+                                      : Icons.local_shipping_rounded,
+                                  size: 15,
+                                  color: fromDispatch
+                                      ? FmsTheme.cyanAccent
+                                      : FmsTheme.emeraldGreen,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  fromDispatch ? 'RUANG KONTROL (DISPATCHER)' : 'KABIN OPERATOR',
+                                  style: TextStyle(
+                                    color: fromDispatch
+                                        ? FmsTheme.cyanAccent
+                                        : FmsTheme.emeraldGreen,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 10.5,
+                                    letterSpacing: 0.4,
+                                  ),
+                                ),
+                                if (isUrgent) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 5,
+                                      vertical: 1.5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: FmsTheme.redHazard,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      'DARURAT / URGENT',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            voice
+                                ? Row(
+                                    children: [
+                                      const Icon(Icons.volume_up, size: 18, color: FmsTheme.cyanAccent),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Transmisi Suara Langsung',
+                                        style: FmsTheme.bodyNormal.copyWith(fontSize: 13),
+                                      ),
+                                    ],
+                                  )
+                                : Text(
+                                    item['body']?.toString() ?? '',
+                                    style: const TextStyle(
+                                      fontSize: 14.0,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                            const SizedBox(height: 4),
+                            Align(
+                              alignment: Alignment.bottomRight,
+                              child: Text(
+                                item['sent_at']
+                                        ?.toString()
+                                        .replaceFirst('T', ' ')
+                                        .split('.')
+                                        .first ??
+                                    '',
+                                style: FmsTheme.caption.copyWith(
+                                  fontSize: 9.0,
+                                  color: FmsTheme.textMuted,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
-                child: Column(
+        ),
+
+        // 3. 1-Touch Quick Presets Grid for Operator
+        Container(
+          height: 38,
+          margin: const EdgeInsets.only(bottom: 6),
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: quickPresets.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 6),
+            itemBuilder: (context, idx) {
+              final preset = quickPresets[idx];
+              return ElevatedButton(
+                onPressed: busy ? null : () => send(preset['text']),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0A2238),
+                  foregroundColor: FmsTheme.cyanAccent,
+                  side: BorderSide(color: FmsTheme.cyanAccent.withValues(alpha: 0.6)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  elevation: 2,
+                ),
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
-                      Icons.phonelink_ring_outlined,
-                      size: 36,
-                      color: FmsTheme.cyanAccent,
-                    ),
-                    const SizedBox(height: 10),
+                    Text(preset['icon'], style: const TextStyle(fontSize: 12)),
+                    const SizedBox(width: 5),
                     Text(
-                      'Hubungkan Kabin ',
-                      style: FmsTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Masukkan kode pasangan dari kontrol untuk mengaktifkan radio dan pesan.',
-                      textAlign: TextAlign.center,
-                      style: FmsTheme.caption,
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: tokenInput,
-                      obscureText: true,
-                      enabled: serviceEnabled,
-                      style: FmsTheme.bodyNormal,
-                      decoration: const InputDecoration(
-                        labelText: 'Kode Pasangan Unit',
-                        prefixIcon: Icon(Icons.key_outlined, size: 18),
-                        isDense: true,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 42,
-                      child: FilledButton.icon(
-                        onPressed: serviceEnabled && !busy ? connect : null,
-                        icon: const Icon(Icons.link, size: 18),
-                        label: const Text('Hubungkan Sekarang'),
+                      preset['label'],
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.3,
                       ),
                     ),
                   ],
                 ),
-              ),
-            ),
-          ),
-        ] else ...[
-          // Messages List Viewport
-          Expanded(
-            child: messages.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.chat_bubble_outline,
-                          size: 32,
-                          color: FmsTheme.textMuted.withValues(alpha: 0.5),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Belum ada pesan komunikasi.',
-                          style: FmsTheme.caption,
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    controller: scrollController,
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    itemCount: messages.length,
-                    itemBuilder: (context, index) {
-                      final item = messages[index];
-                      final fromDispatch = item['sender_role'] == 'dispatcher';
-                      final voice = item['kind'] == 'voice';
-                      final priority = item['priority']?.toString();
-                      final isUrgent = priority == 'urgent';
-
-                      return Align(
-                        alignment: fromDispatch
-                            ? Alignment.centerLeft
-                            : Alignment.centerRight,
-                        child: Container(
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.sizeOf(context).width * 0.76,
-                          ),
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            gradient: fromDispatch
-                                ? const LinearGradient(
-                                    colors: [Color(0xF00D2235), Color(0xF0071322)],
-                                  )
-                                : const LinearGradient(
-                                    colors: [Color(0xF00B2E21), Color(0xF0051711)],
-                                  ),
-                            border: Border.all(
-                              color: isUrgent
-                                  ? FmsTheme.redHazard
-                                  : fromDispatch
-                                      ? FmsTheme.cyanAccent.withValues(alpha: 0.6)
-                                      : FmsTheme.emeraldGreen.withValues(alpha: 0.6),
-                              width: 1.2,
-                            ),
-                            borderRadius: BorderRadius.only(
-                              topLeft: const Radius.circular(10),
-                              topRight: const Radius.circular(10),
-                              bottomLeft: Radius.circular(fromDispatch ? 2 : 10),
-                              bottomRight: Radius.circular(fromDispatch ? 10 : 2),
-                            ),
-                            boxShadow: isUrgent
-                                ? FmsTheme.neonGlowShadow(FmsTheme.redHazard, opacity: 0.3)
-                                : null,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    fromDispatch
-                                        ? Icons.support_agent
-                                        : Icons.local_shipping,
-                                    size: 13,
-                                    color: fromDispatch
-                                        ? FmsTheme.cyanAccent
-                                        : FmsTheme.emeraldGreen,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    fromDispatch ? 'RUANG KONTROL' : 'KABIN',
-                                    style: FmsTheme.caption.copyWith(
-                                      color: fromDispatch
-                                          ? FmsTheme.cyanAccent
-                                          : FmsTheme.emeraldGreen,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 9.5,
-                                    ),
-                                  ),
-                                  if (isUrgent) ...[
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 4,
-                                        vertical: 1,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: FmsTheme.redHazard,
-                                        borderRadius: BorderRadius.circular(3),
-                                      ),
-                                      child: const Text(
-                                        'URGENT',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 7.5,
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              voice
-                                  ? Row(
-                                      children: [
-                                        const Icon(Icons.multitrack_audio, size: 16),
-                                        const SizedBox(width: 6),
-                                        Text('Transmisi Suara Live', style: FmsTheme.bodyNormal),
-                                      ],
-                                    )
-                                  : Text(
-                                      item['body']?.toString() ?? '',
-                                      style: FmsTheme.bodyNormal.copyWith(
-                                        fontSize: 12.5,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                              const SizedBox(height: 3),
-                              Align(
-                                alignment: Alignment.bottomRight,
-                                child: Text(
-                                  item['sent_at']
-                                          ?.toString()
-                                          .replaceFirst('T', ' ')
-                                          .split('.')
-                                          .first ??
-                                      '',
-                                  style: FmsTheme.caption.copyWith(
-                                    fontSize: 8.5,
-                                    color: FmsTheme.textMuted,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-
-          // Quick Presets Bar
-          SizedBox(
-            height: 32,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: quickPresets.length,
-              separatorBuilder: (context, index) => const SizedBox(width: 6),
-              itemBuilder: (context, idx) {
-                final preset = quickPresets[idx];
-                return ActionChip(
-                  visualDensity: VisualDensity.compact,
-                  backgroundColor: const Color(0xFF091C2E),
-                  side: BorderSide(color: FmsTheme.cyanAccent.withValues(alpha: 0.35)),
-                  label: Text(
-                    preset,
-                    style: const TextStyle(fontSize: 10, color: FmsTheme.cyanAccent),
-                  ),
-                  onPressed: busy ? null : () => send(preset),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 6),
-
-          // Text Message Input Bar
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 44,
-                  child: TextField(
-                    controller: messageInput,
-                    maxLength: 500,
-                    onSubmitted: (_) => send(),
-                    style: FmsTheme.bodyNormal,
-                    decoration: InputDecoration(
-                      hintText: 'Ketik pesan ke kontrol...',
-                      hintStyle: FmsTheme.caption,
-                      counterText: '',
-                      filled: true,
-                      fillColor: const Color(0xFF081728),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: FmsTheme.cardBorder),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              SizedBox(
-                width: 44,
-                height: 44,
-                child: IconButton.filled(
-                  tooltip: 'Kirim pesan',
-                  onPressed: busy ? null : () => send(),
-                  style: IconButton.styleFrom(
-                    backgroundColor: FmsTheme.cyanAccent,
-                    foregroundColor: FmsTheme.bgDark,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  icon: const Icon(Icons.send_rounded, size: 18),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // PTT (Push-to-Talk) Talkback Button with Pulsing Animation
-          AnimatedBuilder(
-            animation: _pulseController,
-            builder: (context, child) {
-              final isLive = live.speaking || live.requestingMic;
-              final pulseGlow = isLive
-                  ? FmsTheme.neonGlowShadow(
-                      FmsTheme.redHazard,
-                      opacity: 0.3 + 0.35 * _pulseController.value,
-                      blur: 14 + 6 * _pulseController.value,
-                    )
-                  : null;
-
-              return Container(
-                height: 48,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: pulseGlow,
-                ),
-                child: FilledButton.icon(
-                  onPressed: !live.connected
-                      ? null
-                      : isLive
-                          ? live.stopSpeaking
-                          : live.startSpeaking,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: isLive
-                        ? FmsTheme.redHazard
-                        : FmsTheme.emeraldGreen,
-                    foregroundColor: FmsTheme.bgDark,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  icon: Icon(
-                    isLive ? Icons.stop_circle : Icons.mic,
-                    size: 22,
-                  ),
-                  label: Text(
-                    live.speaking
-                        ? 'SEDANG BICARA (TEKAN UNTUK SELESAI)'
-                        : live.requestingMic
-                            ? 'MEMBUKA KANAL RADIO LIVE...'
-                            : 'TEKAN UNTUK BICARA LANGSUNG KE KONTROL',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 11,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
               );
             },
           ),
-        ],
+        ),
+
+        // 4. Custom Message Input
+        Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 46,
+                child: TextField(
+                  controller: messageInput,
+                  maxLength: 500,
+                  onSubmitted: (_) => send(),
+                  style: FmsTheme.bodyNormal.copyWith(fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Ketik pesan manual...',
+                    hintStyle: FmsTheme.caption.copyWith(fontSize: 11),
+                    counterText: '',
+                    filled: true,
+                    fillColor: const Color(0xFF08192C),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: FmsTheme.cardBorder),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            SizedBox(
+              width: 46,
+              height: 46,
+              child: IconButton.filled(
+                tooltip: 'Kirim Pesan',
+                onPressed: busy ? null : () => send(),
+                style: IconButton.styleFrom(
+                  backgroundColor: FmsTheme.cyanAccent,
+                  foregroundColor: FmsTheme.bgDark,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.send_rounded, size: 20),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // 5. Giant PTT (Push-to-Talk) Button with Pulsing Wave & Mic Indicator
+        AnimatedBuilder(
+          animation: _pulseController,
+          builder: (context, child) {
+            final isLive = live.speaking || live.requestingMic;
+            final isReceiving = live.receivingVoice;
+
+            final Color btnBg = isLive
+                ? FmsTheme.redHazard
+                : isReceiving
+                ? FmsTheme.amberWarning
+                : FmsTheme.emeraldGreen;
+
+            final List<BoxShadow>? glow = isLive || isReceiving
+                ? [
+                    BoxShadow(
+                      color: btnBg.withValues(alpha: 0.4 + 0.35 * _pulseController.value),
+                      blurRadius: 16 + 8 * _pulseController.value,
+                      spreadRadius: 2,
+                    ),
+                  ]
+                : null;
+
+            return Container(
+              height: 52,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: glow,
+              ),
+              child: FilledButton.icon(
+                onPressed: isLive
+                    ? live.stopSpeaking
+                    : isReceiving
+                    ? null
+                    : live.startSpeaking,
+                style: FilledButton.styleFrom(
+                  backgroundColor: btnBg,
+                  foregroundColor: FmsTheme.bgDark,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: Icon(
+                  isLive
+                      ? Icons.stop_circle_rounded
+                      : isReceiving
+                      ? Icons.volume_up_rounded
+                      : Icons.mic_rounded,
+                  size: 24,
+                ),
+                label: Text(
+                  isLive
+                      ? '● SEDANG BICARA KE KONTROL (TEKAN UNTUK SELESAI)'
+                      : isReceiving
+                      ? '🔊 RUANG KONTROL SEDANG BERBICARA...'
+                      : '🎙️ TEKAN UNTUK BICARA LANGSUNG (PTT)',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 11.5,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
       ],
     );
   }
