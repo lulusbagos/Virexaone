@@ -1,3 +1,4 @@
+import 'login_screen.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -21,6 +22,71 @@ class CabinDashboardScreen extends StatefulWidget {
 
 class _CabinDashboardScreenState extends State<CabinDashboardScreen>
     with TickerProviderStateMixin {
+
+  Future<void> _handleExitCockpit() async {
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0D1B2A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: FmsTheme.cyanAccent, width: 1.2),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.exit_to_app_rounded, color: FmsTheme.amberWarning, size: 24),
+            const SizedBox(width: 10),
+            Text(
+              'KELUAR COCKPIT',
+              style: FmsTheme.titleMedium.copyWith(
+                color: FmsTheme.amberWarning,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Apakah Anda yakin ingin keluar dari cockpit unit ini dan kembali ke menu pemilihan unit?',
+          style: TextStyle(color: Color(0xFFE0E6ED), fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('BATAL', style: TextStyle(color: FmsTheme.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE63946),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('YA, KELUAR UNIT', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldExit == true && mounted) {
+      _api.logout();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => LoginScreen(
+            onLoginSuccess: () {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => const CabinDashboardScreen(),
+                ),
+              );
+            },
+          ),
+        ),
+        (route) => false,
+      );
+    }
+  }
+
   late AnimationController _animController;
   late AnimationController _bearingController;
   late AnimationController _motionController;
@@ -474,12 +540,12 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
               ),
               IconButton(
                 icon: const Icon(
-                  Icons.logout_rounded,
-                  size: 18,
-                  color: FmsTheme.textMuted,
+                  Icons.exit_to_app_rounded,
+                  size: 19,
+                  color: FmsTheme.amberWarning,
                 ),
-                tooltip: 'Keluar Cockpit',
-                onPressed: _api.logout,
+                tooltip: 'Ganti Unit / Keluar Cockpit',
+                onPressed: _handleExitCockpit,
               ),
             ],
           ),

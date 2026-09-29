@@ -1307,17 +1307,17 @@ namespace Virexa.FMS.Mobile
 
                     string icon = other.unitType switch
                     {
-                        UnitType.HaulTruck => "🚚",
-                        UnitType.Excavator => "⛏️",
-                        UnitType.Bulldozer => "🚜",
-                        UnitType.Grader => "🚜",
-                        UnitType.WheelLoader => "🚜",
-                        UnitType.FuelTruck => "⛽",
+                        Virexa.FMS.UnitType.HaulTruck => "🚚",
+                        Virexa.FMS.UnitType.Excavator => "⛏️",
+                        Virexa.FMS.UnitType.Bulldozer => "🚜",
+                        Virexa.FMS.UnitType.Grader => "🚜",
+                        Virexa.FMS.UnitType.WheelLoader => "🚜",
+                        Virexa.FMS.UnitType.FuelTruck => "⛽",
                         _ => "🚛"
                     };
 
                     bool isHazardProximity = dist < 35f;
-                    string badgeColor = isHazardProximity ? "#FF3B30" : (other.unitType == UnitType.Excavator ? "#00E5FF" : "#00FFA3");
+                    string badgeColor = isHazardProximity ? "#FF3B30" : (other.unitType == Virexa.FMS.UnitType.Excavator ? "#00E5FF" : "#00FFA3");
                     
                     float blipW = 74f;
                     float blipH = 28f;
@@ -1608,7 +1608,7 @@ namespace Virexa.FMS.Mobile
             float inputW = modalW - 32f - sendW - 8f;
             
             inCabinCustomMessage = GUI.TextField(new Rect(mx + 16, inputY, inputW, 32), inCabinCustomMessage ?? "", keypadBtnStyle);
-            if (GUI.Button(new Rect(mx + 24 + inputW, inputY, sendW, 32), "KIRIM 📨", btnKeyGreenStyle ?? keypadBtnStyle))
+            if (GUI.Button(new Rect(mx + 24 + inputW, inputY, sendW, 32), "KIRIM 📨", keypadBtnStyle))
             {
                 if (!string.IsNullOrWhiteSpace(inCabinCustomMessage))
                 {
