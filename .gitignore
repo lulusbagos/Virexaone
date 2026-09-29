@@ -72,3 +72,6 @@ desktop.ini
 .vscode/
 *.swp
 *.bak
+
+publish/
+
