@@ -59,6 +59,24 @@ namespace Virexa.FMS
         public float cabinTalkbackStartTime = 0f;
         public float cabinTalkbackDuration = 0f;
 
+        public enum InboundCommsPolicy
+        {
+            OpenDirect,          // Bebas langsung masuk (Direct Messages & Direct PTT)
+            RequireAuthorization // Wajib Izin Dispatcher (Request-To-Talk queue)
+        }
+
+        public enum NotificationFilterLevel
+        {
+            AllMessagesAndVoice, // Semua pesan & PTT bersuara
+            UrgentOnly,          // Hanya Urgent & Emergency
+            Muted                // Hening (Visual Saja)
+        }
+
+        [Header("Control Room Communication Policy")]
+        public InboundCommsPolicy commsPolicy = InboundCommsPolicy.OpenDirect;
+        public NotificationFilterLevel notificationFilter = NotificationFilterLevel.AllMessagesAndVoice;
+        public bool autoFollowCameraOnIncomingComms = true;
+
         [Header("Request-To-Talk Queue (Pending Authorization)")]
         public bool hasPendingTalkbackRequest = false;
         public string pendingRequestUnitId = "";
@@ -483,6 +501,13 @@ namespace Virexa.FMS
                     lastActiveCabinUnit = unit;
                     lastActiveCabinTime = Time.time;
 
+                    // If policy is RequireAuthorization for voice PTT
+                    if (commsPolicy == InboundCommsPolicy.RequireAuthorization && isVoice)
+                    {
+                        RequestCabinTalkback(unit, $"{unit} (Operator)");
+                        return;
+                    }
+
                     ChatMessage chatMsg = new ChatMessage
                     {
                         messageId = item.id,
@@ -500,8 +525,12 @@ namespace Virexa.FMS
                     unreadCabinMessagesCount++;
                     OnNewMessageReceived?.Invoke(chatMsg);
 
-                    // Chime audio
-                    Mobile.OperatorAudioFeedbackManager.Instance?.PlayWarningBeep();
+                    // Chime audio based on notification filter level
+                    if (notificationFilter == NotificationFilterLevel.AllMessagesAndVoice ||
+                       (notificationFilter == NotificationFilterLevel.UrgentOnly && isUrgent))
+                    {
+                        Mobile.OperatorAudioFeedbackManager.Instance?.PlayWarningBeep();
+                    }
 
                     // Fire global event & show Dashboard UI popup
                     OnInboundCabinCommsReceived?.Invoke(unit, "OPERATOR", item.body, isVoice, isUrgent);
@@ -509,6 +538,16 @@ namespace Virexa.FMS
                     if (FMSDashboardUI.Instance != null)
                     {
                         FMSDashboardUI.Instance.ShowCabinCommunicationPopup(unit, $"{unit} (Kabin)", item.body, isVoice, isUrgent);
+
+                        if (autoFollowCameraOnIncomingComms)
+                        {
+                            var unitCtrl = FMSFleetManager.Instance?.GetUnitById(unit);
+                            if (unitCtrl != null)
+                            {
+                                FMSFleetManager.Instance.SelectUnit(unitCtrl);
+                                FMSCameraController.Instance?.SetFollowTarget(unitCtrl.transform);
+                            }
+                        }
                     }
                 }
             }

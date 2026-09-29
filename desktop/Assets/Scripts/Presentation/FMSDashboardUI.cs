@@ -194,6 +194,11 @@ namespace Virexa.FMS
         public string dispatchOutgoingMessage = "";
         private Vector2 dispatchChatScrollPos = Vector2.zero;
         private Vector2 dispatchTargetScrollPos = Vector2.zero;
+        private Vector2 dispatchMacroScrollPos = Vector2.zero;
+        private int dispatchModalTab = 0; // 0: Live Comms, 1: Quick Macro Presets, 2: Policy & Settings
+        private string dispatchUnitSearchQuery = "";
+        private int dispatchPriorityIndex = 0; // 0: Normal, 1: Urgent, 2: Emergency
+        private string dispatchTargetCategory = "ALL"; // "ALL", "FLEET_HAULER", "FLEET_EXCAVATOR", "FLEET_SUPPORT", "SINGLE_UNIT"
 
         // Location Filter Modal State
         private string locationSearchQuery = "";
@@ -6022,8 +6027,8 @@ namespace Virexa.FMS
         // =========================================================================
         private void DrawControlRoomDispatchRadioModal(float screenW, float screenH)
         {
-            float modalW = Mathf.Min(880f, screenW - 30f);
-            float modalH = Mathf.Min(600f, screenH - 30f);
+            float modalW = Mathf.Min(960f, screenW - 24f);
+            float modalH = Mathf.Min(640f, screenH - 24f);
             float x = (screenW - modalW) / 2f;
             float y = (screenH - modalH) / 2f;
 
@@ -6035,150 +6040,435 @@ namespace Virexa.FMS
             if (lineAccentTex != null)
                 GUI.DrawTexture(new Rect(x + 2, y + 2, modalW - 4, 2), lineAccentTex);
 
-            // Modal Header
-            GUI.Label(new Rect(x + 20, y + 14, modalW - 100, 24), "📻 <b>FMS TWO-WAY RADIO & DISPATCH MESSENGER (CONTROL ROOM)</b>", brandLogoStyle ?? coordStyle);
+            // Modal Header with status indicator
+            string policyBadge = FMSFleetMessenger.Instance != null && FMSFleetMessenger.Instance.commsPolicy == FMSFleetMessenger.InboundCommsPolicy.RequireAuthorization 
+                ? "<color=#FFB800>[🔐 WAJIB IZIN DISPATCH]</color>" 
+                : "<color=#00FFA3>[🔓 SALURAN BEBAS / OPEN]</color>";
+            
+            GUI.Label(new Rect(x + 20, y + 12, modalW - 140, 24), 
+                $"📻 <b>ASTHA COMMAND DISPATCH & FLEET RADIO STATION</b>  {policyBadge}", brandLogoStyle ?? coordStyle);
 
-            if (GUI.Button(new Rect(x + modalW - 100, y + 10, 80, 26), "✕ Tutup", navBtnStyle))
+            if (GUI.Button(new Rect(x + modalW - 90, y + 10, 75, 26), "✕ Tutup", navBtnStyle))
             {
                 showDispatchRadioModal = false;
             }
 
-            float curY = y + 44;
+            float curY = y + 42;
 
-            // Target Unit Selector Row
-            GUI.Label(new Rect(x + 20, curY, 130, 24), "🎯 <b>PILIH TUJUAN:</b>", hintStyle);
+            // 1. SUB-TABS NAVIGATION BAR
+            float tabW = (modalW - 40f) / 3f;
+            string[] tabs = { "💬 Radio & Komunikasi Live", "⚡ Template Pesan Cepat (Macro)", "⚙️ Pengaturan Izin & Otorisasi" };
+            for (int t = 0; t < tabs.Length; t++)
+            {
+                bool isTabActive = dispatchModalTab == t;
+                GUIStyle tStyle = isTabActive ? navBtnActiveStyle : navBtnStyle;
+                if (GUI.Button(new Rect(x + 20 + t * tabW, curY, tabW - 4, 28), tabs[t], tStyle))
+                {
+                    dispatchModalTab = t;
+                }
+            }
+            curY += 34f;
+
+            // 2. TARGET SELECTION BAR (Universal across tabs)
+            GUI.Box(new Rect(x + 20, curY, modalW - 40, 36), GUIContent.none, dropdownPanelStyle);
+            GUI.Label(new Rect(x + 30, curY + 8, 90, 20), "🎯 <b>TUJUAN:</b>", hintStyle);
+
+            float tBtnX = x + 120;
+            float tBtnW = (modalW - 160f) / 5f;
+
+            // Target Option 1: ALL FLEET
             bool isAll = dispatchSelectedUnitTarget == "ALL";
-            if (GUI.Button(new Rect(x + 140, curY, modalW - 160f, 24), isAll ? "SEMUA ARMADA (AKTIF)" : "Kirim ke semua armada", isAll ? navBtnActiveStyle : navBtnStyle))
+            if (GUI.Button(new Rect(tBtnX, curY + 5, tBtnW - 4, 26), "🌐 SEMUA ARMADA", isAll ? navBtnActiveStyle : navBtnStyle))
             {
                 dispatchSelectedUnitTarget = "ALL";
-            }
-            curY += 28f;
-            var fleet = FMSFleetManager.Instance != null ? FMSFleetManager.Instance.activeFleet : null;
-            int unitCount = fleet != null ? fleet.Count : 0;
-            float quickBtnW = (modalW - 83f) / 4f;
-            dispatchTargetScrollPos = GUI.BeginScrollView(
-                new Rect(x + 20f, curY, modalW - 40f, 58f), dispatchTargetScrollPos,
-                new Rect(0f, 0f, modalW - 58f, Mathf.Max(54f, Mathf.CeilToInt(unitCount / 4f) * 27f)));
-            for (int i = 0; i < unitCount; i++)
-            {
-                var fleetUnit = fleet[i];
-                if (fleetUnit == null || string.IsNullOrEmpty(fleetUnit.unitId)) continue;
-                bool isSel = dispatchSelectedUnitTarget == fleetUnit.unitId;
-                if (GUI.Button(new Rect((i % 4) * (quickBtnW + 5f), (i / 4) * 27f,
-                    quickBtnW, 24f), fleetUnit.unitId, isSel ? navBtnActiveStyle : navBtnStyle))
-                    dispatchSelectedUnitTarget = fleetUnit.unitId;
-            }
-            if (unitCount == 0)
-                GUI.Label(new Rect(0f, 0f, modalW - 58f, 24f), "Belum ada unit aktif; gunakan siaran semua armada.", hintStyle);
-            GUI.EndScrollView();
-            curY += 60f;
-
-            // Chat Message Scroll View
-            float chatBoxH = Mathf.Max(80f, modalH - 285f);
-            var msgs = FMSFleetMessenger.Instance != null ? FMSFleetMessenger.Instance.messageHistory : new List<FMSFleetMessenger.ChatMessage>();
-
-            Rect scrollArea = new Rect(x + 20, curY, modalW - 40, chatBoxH);
-            float totalContentH = Mathf.Max(chatBoxH, msgs.Count * 60f + 20f);
-            Rect viewArea = new Rect(0, 0, modalW - 60, totalContentH);
-
-            dispatchChatScrollPos = GUI.BeginScrollView(scrollArea, dispatchChatScrollPos, viewArea);
-            float itemY = 4f;
-
-            foreach (var msg in msgs)
-            {
-                bool isDispatcher = msg.senderRole == "DISPATCHER";
-                float msgW = viewArea.width * 0.85f;
-                float msgX = isDispatcher ? 4f : (viewArea.width - msgW - 6);
-
-                GUI.Box(new Rect(msgX, itemY, msgW, 52), GUIContent.none, dropdownPanelStyle);
-
-                string badgeColor = isDispatcher ? "#00E5FF" : "#00FFA3";
-                string roleBadge = isDispatcher ? "[DISPATCH CONTROL]" : "[KABIN OPERATOR]";
-                string targetBadge = msg.targetUnitId == "ALL" ? "<color=#FFB800>[BROADCAST ALL]</color>" : $"<color=#00FFA3>[Target: {msg.targetUnitId}]</color>";
-
-                GUI.Label(new Rect(msgX + 10, itemY + 4, msgW - 20, 18), $"<color={badgeColor}><b>{roleBadge} {msg.senderName}</b></color>  {targetBadge}  <color=#88A0B8>{msg.timestamp}</color>", hintStyle);
-                GUI.Label(new Rect(msgX + 10, itemY + 22, msgW - 20, 26), msg.messageText, hintStyle);
-
-                itemY += 58f;
+                dispatchTargetCategory = "ALL";
             }
 
-            GUI.EndScrollView();
-            curY += chatBoxH + 10;
-
-            // Mining Dispatch Macro Chips
-            GUI.Label(new Rect(x + 20, curY, modalW - 40, 18), "⚡ <b>TEMPLATE PERINTAH DISPATCH CEPAT (1-CLICK MACRO):</b>", hintStyle);
-            curY += 22;
-
-            float mBtnW = (modalW - 40 - 15) / 4f;
-            if (GUI.Button(new Rect(x + 20, curY, mBtnW, 26), "Kondisi jalan", navBtnStyle))
+            // Target Option 2: ALL HAULER
+            bool isHauler = dispatchSelectedUnitTarget == "FLEET_HAULER";
+            if (GUI.Button(new Rect(tBtnX + tBtnW, curY + 5, tBtnW - 4, 26), "🚚 SEMUA HAULER", isHauler ? navBtnActiveStyle : navBtnStyle))
             {
-                dispatchOutgoingMessage = "Perhatian armada: Periksa kondisi jalan dan sesuaikan kecepatan dengan instruksi pengawas lapangan.";
+                dispatchSelectedUnitTarget = "FLEET_HAULER";
+                dispatchTargetCategory = "FLEET_HAULER";
             }
-            if (GUI.Button(new Rect(x + 25 + mBtnW, curY, mBtnW, 26), "Zona peledakan", navBtnStyle))
-            {
-                dispatchOutgoingMessage = "Perhatian armada: Konfirmasi jadwal dan zona aman peledakan kepada pengawas sebelum melintas.";
-            }
-            if (GUI.Button(new Rect(x + 30 + mBtnW * 2, curY, mBtnW, 26), "Bahan bakar", navBtnStyle))
-            {
-                dispatchOutgoingMessage = "Silakan konfirmasi kebutuhan pengisian bahan bakar dan lokasi stasiun yang tersedia.";
-            }
-            if (GUI.Button(new Rect(x + 35 + mBtnW * 3, curY, mBtnW, 26), "Pengalihan rute", navBtnStyle))
-            {
-                dispatchOutgoingMessage = "Konfirmasi pengalihan rute dan unit pemuat tujuan dengan dispatcher sebelum bergerak.";
-            }
-            curY += 32;
 
-            // Outgoing Message Input & Talkback Voice Row
-            float inputRowW = modalW - 40;
-            float pttBtnW = 200f;
-            float sendBtnW = 120f;
-            float textInputW = inputRowW - pttBtnW - sendBtnW - 16;
-
-            GUI.Box(new Rect(x + 20, curY, textInputW, 36), GUIContent.none, dropdownPanelStyle);
-            dispatchOutgoingMessage = GUI.TextField(new Rect(x + 26, curY + 6, textInputW - 12, 24), dispatchOutgoingMessage, GUI.skin.textField);
-
-            if (GUI.Button(new Rect(x + 28 + textInputW, curY, sendBtnW, 36), "KIRIM 📨", navBtnActiveStyle))
+            // Target Option 3: ALL EXCAVATOR
+            bool isEx = dispatchSelectedUnitTarget == "FLEET_EXCAVATOR";
+            if (GUI.Button(new Rect(tBtnX + tBtnW * 2, curY + 5, tBtnW - 4, 26), "⛏️ SEMUA EXCAVATOR", isEx ? navBtnActiveStyle : navBtnStyle))
             {
-                if (!string.IsNullOrEmpty(dispatchOutgoingMessage))
+                dispatchSelectedUnitTarget = "FLEET_EXCAVATOR";
+                dispatchTargetCategory = "FLEET_EXCAVATOR";
+            }
+
+            // Target Option 4: SUPPORT (DOZER/GRADER)
+            bool isSupport = dispatchSelectedUnitTarget == "FLEET_SUPPORT";
+            if (GUI.Button(new Rect(tBtnX + tBtnW * 3, curY + 5, tBtnW - 4, 26), "🚜 SUPPORT UNIT", isSupport ? navBtnActiveStyle : navBtnStyle))
+            {
+                dispatchSelectedUnitTarget = "FLEET_SUPPORT";
+                dispatchTargetCategory = "FLEET_SUPPORT";
+            }
+
+            // Target Option 5: SINGLE SPECIFIC UNIT
+            bool isSingle = !isAll && !isHauler && !isEx && !isSupport;
+            string singleLabel = isSingle ? $"🎯 UNIT: {dispatchSelectedUnitTarget}" : "🎯 1 UNIT SPESIFIK";
+            if (GUI.Button(new Rect(tBtnX + tBtnW * 4, curY + 5, tBtnW - 4, 26), singleLabel, isSingle ? navBtnActiveStyle : navBtnStyle))
+            {
+                dispatchTargetCategory = "SINGLE_UNIT";
+                if (isAll || isHauler || isEx || isSupport)
+                {
+                    var firstUnit = FMSFleetManager.Instance?.activeFleet?.Find(u => u != null && !string.IsNullOrEmpty(u.unitId));
+                    if (firstUnit != null) dispatchSelectedUnitTarget = firstUnit.unitId;
+                }
+            }
+            curY += 40f;
+
+            // Unit Quick Picker Sub-row when SINGLE_UNIT is selected
+            if (dispatchTargetCategory == "SINGLE_UNIT" || isSingle)
+            {
+                GUI.Box(new Rect(x + 20, curY, modalW - 40, 52), GUIContent.none, dropdownPanelStyle);
+                GUI.Label(new Rect(x + 28, curY + 6, 80, 20), "🔍 Cari Unit:", hintStyle);
+                dispatchUnitSearchQuery = GUI.TextField(new Rect(x + 105, curY + 4, 130, 22), dispatchUnitSearchQuery, GUI.skin.textField);
+
+                var fleet = FMSFleetManager.Instance != null ? FMSFleetManager.Instance.activeFleet : null;
+                List<FMSUnitController> filteredUnits = new List<FMSUnitController>();
+                if (fleet != null)
+                {
+                    foreach (var u in fleet)
+                    {
+                        if (u == null || string.IsNullOrEmpty(u.unitId)) continue;
+                        if (string.IsNullOrEmpty(dispatchUnitSearchQuery) || u.unitId.IndexOf(dispatchUnitSearchQuery, StringComparison.OrdinalIgnoreCase) >= 0)
+                            filteredUnits.Add(u);
+                    }
+                }
+
+                float uChipW = 86f;
+                float uScrollW = modalW - 290f;
+                float uTotalW = Mathf.Max(uScrollW, filteredUnits.Count * (uChipW + 6f));
+                dispatchTargetScrollPos = GUI.BeginScrollView(
+                    new Rect(x + 245f, curY + 3f, uScrollW, 44f), dispatchTargetScrollPos,
+                    new Rect(0f, 0f, uTotalW, 28f));
+
+                for (int i = 0; i < filteredUnits.Count; i++)
+                {
+                    var u = filteredUnits[i];
+                    bool isUnitSel = dispatchSelectedUnitTarget.Equals(u.unitId, StringComparison.OrdinalIgnoreCase);
+                    GUIStyle uStyle = isUnitSel ? navBtnActiveStyle : navBtnStyle;
+                    if (GUI.Button(new Rect(i * (uChipW + 6f), 2f, uChipW, 26f), u.unitId, uStyle))
+                    {
+                        dispatchSelectedUnitTarget = u.unitId;
+                    }
+                }
+                GUI.EndScrollView();
+                curY += 56f;
+            }
+
+            // =========================================================================
+            // TAB 0: LIVE RADIO & CHAT COMMS
+            // =========================================================================
+            if (dispatchModalTab == 0)
+            {
+                float chatBoxH = modalH - (curY - y) - 95f;
+                var msgs = FMSFleetMessenger.Instance != null ? FMSFleetMessenger.Instance.messageHistory : new List<FMSFleetMessenger.ChatMessage>();
+
+                Rect scrollArea = new Rect(x + 20, curY, modalW - 40, chatBoxH);
+                float totalContentH = Mathf.Max(chatBoxH, msgs.Count * 64f + 20f);
+                Rect viewArea = new Rect(0, 0, modalW - 60, totalContentH);
+
+                dispatchChatScrollPos = GUI.BeginScrollView(scrollArea, dispatchChatScrollPos, viewArea);
+                float itemY = 4f;
+
+                for (int i = 0; i < msgs.Count; i++)
+                {
+                    var msg = msgs[i];
+                    bool isDispatcher = msg.senderRole == "DISPATCHER";
+                    float msgW = viewArea.width * 0.88f;
+                    float msgX = isDispatcher ? 4f : (viewArea.width - msgW - 6);
+
+                    GUI.Box(new Rect(msgX, itemY, msgW, 56), GUIContent.none, dropdownPanelStyle);
+
+                    string badgeColor = isDispatcher ? "#00E5FF" : "#00FFA3";
+                    string roleBadge = isDispatcher ? "📻 [DISPATCH CONTROL]" : "🚚 [KABIN OPERATOR]";
+                    string targetBadge = msg.targetUnitId == "ALL" ? "<color=#FFB800>[BROADCAST ALL]</color>" : 
+                                         (msg.targetUnitId.StartsWith("FLEET_") ? $"<color=#00E5FF>[{msg.targetUnitId}]</color>" : $"<color=#00FFA3>[Target: {msg.targetUnitId}]</color>");
+                    string priorityBadge = msg.priority == FMSFleetMessenger.MessagePriority.Urgent ? "<color=#FFB800>[URGENT]</color> " :
+                                          (msg.priority == FMSFleetMessenger.MessagePriority.Emergency ? "<color=#FF4D4D>[EMERGENCY]</color> " : "");
+
+                    GUI.Label(new Rect(msgX + 10, itemY + 4, msgW - 140, 18), 
+                        $"<color={badgeColor}><b>{roleBadge} {msg.senderName}</b></color>  {targetBadge} {priorityBadge} <color=#88A0B8>{msg.timestamp}</color>", hintStyle);
+                    
+                    GUI.Label(new Rect(msgX + 10, itemY + 24, msgW - 140, 28), msg.messageText, alertBodyStyle ?? hintStyle);
+
+                    // Quick Jump / 3D Track button for cabin messages
+                    if (!isDispatcher)
+                    {
+                        if (GUI.Button(new Rect(msgX + msgW - 120, itemY + 12, 110, 30), "🎯 Track 3D", navBtnStyle))
+                        {
+                            string unitId = msg.senderName.Split(' ')[0].Replace("(", "").Replace(")", "");
+                            var unit = FMSFleetManager.Instance?.GetUnitById(unitId);
+                            if (unit != null)
+                            {
+                                FMSFleetManager.Instance.SelectUnit(unit);
+                                FMSCameraController.Instance?.SetFollowTarget(unit.transform);
+                                FMSCameraController.Instance?.JumpTo(unit.transform.position, 90f);
+                                ShowNotification($"🎯 Kamera 3D Mengikuti {unitId}");
+                            }
+                        }
+                    }
+
+                    itemY += 62f;
+                }
+
+                GUI.EndScrollView();
+                curY += chatBoxH + 10;
+
+                // Priority Selector Chips + Outgoing Text Box + Send + PTT
+                float priW = 85f;
+                string[] priLabels = { "🟢 Normal", "🟡 Urgent", "🔴 Darurat" };
+                for (int p = 0; p < priLabels.Length; p++)
+                {
+                    bool isPriSel = dispatchPriorityIndex == p;
+                    if (GUI.Button(new Rect(x + 20 + p * (priW + 4), curY, priW, 26), priLabels[p], isPriSel ? navBtnActiveStyle : navBtnStyle))
+                    {
+                        dispatchPriorityIndex = p;
+                    }
+                }
+
+                // Target indicator label
+                string targetDisplayName = dispatchSelectedUnitTarget == "ALL" ? "SEMUA ARMADA (BROADCAST)" :
+                                           (dispatchSelectedUnitTarget == "FLEET_HAULER" ? "SEMUA HAULER (RD)" :
+                                           (dispatchSelectedUnitTarget == "FLEET_EXCAVATOR" ? "SEMUA EXCAVATOR (EX)" :
+                                           (dispatchSelectedUnitTarget == "FLEET_SUPPORT" ? "SEMUA SUPPORT UNIT" : $"UNIT {dispatchSelectedUnitTarget}")));
+
+                GUI.Label(new Rect(x + 300, curY + 4, modalW - 320, 20), $"Kirim ke: <color=#00FFA3><b>{targetDisplayName}</b></color>", hintStyle);
+                curY += 30;
+
+                // Message Text Field & Action Buttons
+                float pttBtnW = 200f;
+                float sendBtnW = 120f;
+                float textInputW = modalW - 40 - pttBtnW - sendBtnW - 16;
+
+                GUI.Box(new Rect(x + 20, curY, textInputW, 36), GUIContent.none, dropdownPanelStyle);
+                dispatchOutgoingMessage = GUI.TextField(new Rect(x + 26, curY + 6, textInputW - 12, 24), dispatchOutgoingMessage, GUI.skin.textField);
+
+                // Handle keyboard Enter to send
+                Event curEvent = Event.current;
+                if (curEvent != null && curEvent.type == EventType.KeyDown && curEvent.keyCode == KeyCode.Return && GUI.GetNameOfFocusedControl() != "")
+                {
+                    if (!string.IsNullOrWhiteSpace(dispatchOutgoingMessage))
+                    {
+                        var pri = dispatchPriorityIndex == 1 ? FMSFleetMessenger.MessagePriority.Urgent :
+                                 (dispatchPriorityIndex == 2 ? FMSFleetMessenger.MessagePriority.Emergency : FMSFleetMessenger.MessagePriority.Normal);
+                        FMSFleetMessenger.Instance?.SendFromControlRoom(dispatchSelectedUnitTarget, dispatchOutgoingMessage, pri);
+                        dispatchOutgoingMessage = "";
+                        curEvent.Use();
+                    }
+                }
+
+                if (GUI.Button(new Rect(x + 28 + textInputW, curY, sendBtnW, 36), "KIRIM 📨", navBtnActiveStyle))
+                {
+                    if (!string.IsNullOrWhiteSpace(dispatchOutgoingMessage))
+                    {
+                        var pri = dispatchPriorityIndex == 1 ? FMSFleetMessenger.MessagePriority.Urgent :
+                                 (dispatchPriorityIndex == 2 ? FMSFleetMessenger.MessagePriority.Emergency : FMSFleetMessenger.MessagePriority.Normal);
+                        FMSFleetMessenger.Instance?.SendFromControlRoom(dispatchSelectedUnitTarget, dispatchOutgoingMessage, pri);
+                        dispatchOutgoingMessage = "";
+                    }
+                }
+
+                // Push-to-Talk Talkback Button
+                bool isTransmitting = FMSFleetMessenger.Instance != null && FMSFleetMessenger.Instance.isTalkbackActive;
+                string pttLabel = isTransmitting ? $"🔴 ON-AIR ({FMSFleetMessenger.Instance.talkbackDuration:F1}s)" : "🎙️ TALKBACK (PTT)";
+                GUIStyle pttStyle = isTransmitting ? navBtnActiveStyle : navBtnStyle;
+
+                if (GUI.Button(new Rect(x + 36 + textInputW + sendBtnW, curY, pttBtnW, 36), pttLabel, pttStyle))
                 {
                     if (FMSFleetMessenger.Instance != null)
                     {
-                        FMSFleetMessenger.Instance.SendFromControlRoom(dispatchSelectedUnitTarget, dispatchOutgoingMessage);
+                        if (!FMSFleetMessenger.Instance.isTalkbackActive)
+                            FMSFleetMessenger.Instance.StartTalkback(dispatchSelectedUnitTarget);
+                        else
+                            FMSFleetMessenger.Instance.StopTalkback();
                     }
-                    dispatchOutgoingMessage = "";
                 }
             }
-
-            // PUSH-TO-TALK TALKBACK VOICE BUTTON
-            bool isTransmitting = FMSFleetMessenger.Instance != null && FMSFleetMessenger.Instance.isTalkbackActive;
-            string pttLabel = isTransmitting ? $"🔴 ON-AIR ({FMSFleetMessenger.Instance.talkbackDuration:F1}s)" : "🎙️ TALKBACK (VOICE)";
-            GUIStyle pttStyle = isTransmitting ? navBtnActiveStyle : navBtnStyle;
-
-            if (GUI.Button(new Rect(x + 36 + textInputW + sendBtnW, curY, pttBtnW, 36), pttLabel, pttStyle))
+            // =========================================================================
+            // TAB 1: QUICK DISPATCH PRESETS & 1-CLICK MACROS
+            // =========================================================================
+            else if (dispatchModalTab == 1)
             {
-                if (FMSFleetMessenger.Instance != null)
+                float macroScrollH = modalH - (curY - y) - 20f;
+                Rect macroScrollArea = new Rect(x + 20, curY, modalW - 40, macroScrollH);
+                Rect macroViewArea = new Rect(0, 0, modalW - 60, 520f);
+
+                dispatchMacroScrollPos = GUI.BeginScrollView(macroScrollArea, dispatchMacroScrollPos, macroViewArea);
+                float mY = 10f;
+
+                // Group 1: Safety & Emergency
+                GUI.Label(new Rect(10, mY, macroViewArea.width, 22), "🚨 <b>KESELAMATAN KERJA & KONDISI DARURAT (SAFETY & EMERGENCY):</b>", brandLogoStyle ?? coordStyle);
+                mY += 26f;
+
+                string[,] safetyPresets = {
+                    { "⚠️ Peringatan Peledakan (Blasting Pit)", "Perhatian seluruh armada: Area Blasting Pit aktif. Kosongkan area dalam radius aman 500 meter segera!" },
+                    { "🌧️ Hujan Deras / Jalan Licin", "Perhatian pengemudi: Hujan turun di jalur hauling. Batasi kecepatan maksimal 20 km/jam dan jaga jarak aman 40m." },
+                    { "🛑 STOP OPERASI PIT", "INSTRUKSI DARURAT: Semua pergerakan unit STOP OPERASI. Parkir unit di posisi aman dan tunggu instruksi pengawas." },
+                    { "🧗 Bahaya Geoteknik / Retakan Lereng", "Peringatan Geoteknik: Terdeteksi retakan di kaki lereng pit. Jauhi area dinding highwall disposal segera." }
+                };
+                mY = DrawMacroGridGroup(safetyPresets, mY, macroViewArea.width, FMSFleetMessenger.MessagePriority.Urgent);
+
+                // Group 2: Mining Operations & Routing
+                mY += 14f;
+                GUI.Label(new Rect(10, mY, macroViewArea.width, 22), "⛏️ <b>OPERASIONAL & PENGALIHAN RUTE (MINING OPS & DISPATCH):</b>", brandLogoStyle ?? coordStyle);
+                mY += 26f;
+
+                string[,] opsPresets = {
+                    { "🚜 Pengalihan ke Shovel EX-201", "Instruksi Dispatch: Armada hauler silakan langsung menuju Loading Front Shovel EX-201 Pit Barat." },
+                    { "🚜 Pengalihan ke Shovel EX-204", "Instruksi Dispatch: Antrean padat di EX-201. Unit berikutnya dialihkan loading di Shovel EX-204 Front Timur." },
+                    { "🚛 Antrean Shovel Padat", "Perhatian hauler: Antrean alat muat sedang padat. Kurangi laju hauling dan tunggu pemanggilan antrean." },
+                    { "📦 Dumping Disposal Barat", "Instruksi Disposal: Dumping batuan waste dialihkan ke Disposal Barat Crest Level 120." },
+                    { "🟢 Operasional Berjalan Normal", "Informasi Operasional: Jalur hauling aman dan cuaca cerah. Lanjutkan ritase sesuai target shift." }
+                };
+                mY = DrawMacroGridGroup(opsPresets, mY, macroViewArea.width, FMSFleetMessenger.MessagePriority.Normal);
+
+                // Group 3: Maintenance & Support
+                mY += 14f;
+                GUI.Label(new Rect(10, mY, macroViewArea.width, 22), "🛠️ <b>PEMELIHARAAN, LOGISTIK & SHIFT (MTC & SUPPORT):</b>", brandLogoStyle ?? coordStyle);
+                mY += 26f;
+
+                string[,] mtcPresets = {
+                    { "⛽ Fuel Truck Ready di Rest Area", "Informasi Logistik: Fuel Truck FT-01 telah standby di Rest Area Pit Barat. Unit berindikator BBM rendah segera merapat." },
+                    { "📋 Waktu P2H & Cek Ban", "Pengingat Operator: Periksa kondisi P2H, baut roda, dan tekanan ban sebelum melanjutkan hauling ritase berikutnya." },
+                    { "🍽️ Pergantian Shift & Istirahat", "Informasi Shift: Waktu istirahat dan pergantian operator dimulai. Parkir unit di tempat yang telah ditentukan." },
+                    { "🔧 Unit Trouble / Kerusakan", "Instruksi Breakdown: Parkir unit di tepi jalan hauling, pasang ganjal roda, safety cone, dan hubungi tim maintenance." }
+                };
+                mY = DrawMacroGridGroup(mtcPresets, mY, macroViewArea.width, FMSFleetMessenger.MessagePriority.Normal);
+
+                GUI.EndScrollView();
+            }
+            // =========================================================================
+            // TAB 2: COMMS POLICY, AUTHORIZATION & SETTINGS
+            // =========================================================================
+            else if (dispatchModalTab == 2)
+            {
+                float setScrollH = modalH - (curY - y) - 20f;
+                Rect setScrollArea = new Rect(x + 20, curY, modalW - 40, setScrollH);
+                Rect setViewArea = new Rect(0, 0, modalW - 60, 480f);
+
+                dispatchMacroScrollPos = GUI.BeginScrollView(setScrollArea, dispatchMacroScrollPos, setViewArea);
+                float sY = 10f;
+
+                // Card 1: Inbound Comms Policy Mode
+                GUI.Box(new Rect(10, sY, setViewArea.width - 20, 110), GUIContent.none, dropdownPanelStyle);
+                GUI.Label(new Rect(24, sY + 8, setViewArea.width - 50, 22), "🔐 <b>KEBIJAKAN PENERIMAAN KOMUNIKASI KABIN (AUTHORIZATION POLICY):</b>", brandLogoStyle ?? coordStyle);
+
+                bool isOpenMode = FMSFleetMessenger.Instance == null || FMSFleetMessenger.Instance.commsPolicy == FMSFleetMessenger.InboundCommsPolicy.OpenDirect;
+                
+                if (GUI.Button(new Rect(24, sY + 36, (setViewArea.width - 70) / 2f, 32), "🔓 MODE TERBUKA BEBAS (OPEN MIC)", isOpenMode ? navBtnActiveStyle : navBtnStyle))
                 {
-                    if (!FMSFleetMessenger.Instance.isTalkbackActive)
-                    {
-                        FMSFleetMessenger.Instance.StartTalkback(dispatchSelectedUnitTarget);
-                    }
-                    else
-                    {
-                        FMSFleetMessenger.Instance.StopTalkback();
-                    }
+                    if (FMSFleetMessenger.Instance != null) FMSFleetMessenger.Instance.commsPolicy = FMSFleetMessenger.InboundCommsPolicy.OpenDirect;
+                    ShowNotification("🔓 Kebijakan Komunikasi: Mode Terbuka Bebas (Direct Communication)");
                 }
+
+                bool isReqAuth = FMSFleetMessenger.Instance != null && FMSFleetMessenger.Instance.commsPolicy == FMSFleetMessenger.InboundCommsPolicy.RequireAuthorization;
+                if (GUI.Button(new Rect(34 + (setViewArea.width - 70) / 2f, sY + 36, (setViewArea.width - 70) / 2f, 32), "🔐 WAJIB IZIN DISPATCH (REQUEST-TO-TALK)", isReqAuth ? navBtnActiveStyle : navBtnStyle))
+                {
+                    if (FMSFleetMessenger.Instance != null) FMSFleetMessenger.Instance.commsPolicy = FMSFleetMessenger.InboundCommsPolicy.RequireAuthorization;
+                    ShowNotification("🔐 Kebijakan Komunikasi: Wajib Izin Dispatch (Request-To-Talk Queue)");
+                }
+
+                string policyNote = isOpenMode 
+                    ? "<i>Mode Terbuka: Operator kabin bebas mengirim pesan teks & transmisi suara PTT langsung ke Ruang Kontrol kapan saja.</i>"
+                    : "<i>Mode Wajib Izin: Transmisi suara kabin akan diantrekan, dan Dispatcher harus menyetujui (Approve) sebelum channel dibuka.</i>";
+                GUI.Label(new Rect(24, sY + 76, setViewArea.width - 50, 26), policyNote, hintStyle);
+
+                sY += 124f;
+
+                // Card 2: Notification & Audio Chime Filter
+                GUI.Box(new Rect(10, sY, setViewArea.width - 20, 100), GUIContent.none, dropdownPanelStyle);
+                GUI.Label(new Rect(24, sY + 8, setViewArea.width - 50, 22), "🔔 <b>FILTER NOTIFIKASI & AUDIO ALERT RUANG KONTROL:</b>", brandLogoStyle ?? coordStyle);
+
+                var filter = FMSFleetMessenger.Instance != null ? FMSFleetMessenger.Instance.notificationFilter : FMSFleetMessenger.NotificationFilterLevel.AllMessagesAndVoice;
+                float fBtnW = (setViewArea.width - 80) / 3f;
+
+                if (GUI.Button(new Rect(24, sY + 36, fBtnW, 30), "🔔 Semua Pesan & Suara", filter == FMSFleetMessenger.NotificationFilterLevel.AllMessagesAndVoice ? navBtnActiveStyle : navBtnStyle))
+                {
+                    if (FMSFleetMessenger.Instance != null) FMSFleetMessenger.Instance.notificationFilter = FMSFleetMessenger.NotificationFilterLevel.AllMessagesAndVoice;
+                }
+                if (GUI.Button(new Rect(30 + fBtnW, sY + 36, fBtnW, 30), "⚠️ Hanya Urgent / Darurat", filter == FMSFleetMessenger.NotificationFilterLevel.UrgentOnly ? navBtnActiveStyle : navBtnStyle))
+                {
+                    if (FMSFleetMessenger.Instance != null) FMSFleetMessenger.Instance.notificationFilter = FMSFleetMessenger.NotificationFilterLevel.UrgentOnly;
+                }
+                if (GUI.Button(new Rect(36 + fBtnW * 2, sY + 36, fBtnW, 30), "🔇 Mode Hening (Mute Audio)", filter == FMSFleetMessenger.NotificationFilterLevel.Muted ? navBtnActiveStyle : navBtnStyle))
+                {
+                    if (FMSFleetMessenger.Instance != null) FMSFleetMessenger.Instance.notificationFilter = FMSFleetMessenger.NotificationFilterLevel.Muted;
+                }
+
+                GUI.Label(new Rect(24, sY + 72, setViewArea.width - 50, 20), "Mengatur nada dering dan kemunculan pop-up saat komunikasi kabin masuk ke Control Room.", hintStyle);
+
+                sY += 114f;
+
+                // Card 3: 3D Camera Follow Automation
+                GUI.Box(new Rect(10, sY, setViewArea.width - 20, 90), GUIContent.none, dropdownPanelStyle);
+                GUI.Label(new Rect(24, sY + 8, setViewArea.width - 50, 22), "🛰️ <b>INTEGRASI KAMERA 3D OTOMATIS:</b>", brandLogoStyle ?? coordStyle);
+
+                bool autoCam = FMSFleetMessenger.Instance != null && FMSFleetMessenger.Instance.autoFollowCameraOnIncomingComms;
+                string autoCamLabel = autoCam ? "✅ AKTIF: Kamera Otomatis Ikuti Unit yang Mengirim Pesan/PTT" : "❌ NONAKTIF: Kamera Tetap di Posisi Orbit Bebas";
+                if (GUI.Button(new Rect(24, sY + 36, setViewArea.width - 50, 32), autoCamLabel, autoCam ? navBtnActiveStyle : navBtnStyle))
+                {
+                    if (FMSFleetMessenger.Instance != null)
+                        FMSFleetMessenger.Instance.autoFollowCameraOnIncomingComms = !FMSFleetMessenger.Instance.autoFollowCameraOnIncomingComms;
+                }
+
+                sY += 104f;
+
+                // Card 4: Backend Diagnostic & Status
+                GUI.Box(new Rect(10, sY, setViewArea.width - 20, 75), GUIContent.none, dropdownPanelStyle);
+                string commsStatus = FMSFleetMessenger.Instance != null ? FMSFleetMessenger.Instance.lastBackendCommsStatus : "Standby";
+                GUI.Label(new Rect(24, sY + 8, setViewArea.width - 50, 20), $"🌐 <b>Status Endpoint Backend:</b> <color=#00FFA3>{commsStatus}</color>", hintStyle);
+                GUI.Label(new Rect(24, sY + 32, setViewArea.width - 50, 20), $"Kunci Dispatcher: <color=#00E5FF>astha-local-dispatcher-key-2026-09</color> | Port: <color=#FFB800>8000</color>", hintStyle);
+
+                GUI.EndScrollView();
+            }
+        }
+
+        private float DrawMacroGridGroup(string[,] presets, float startY, float totalWidth, FMSFleetMessenger.MessagePriority priority)
+        {
+            float curY = startY;
+            int count = presets.GetLength(0);
+
+            for (int i = 0; i < count; i++)
+            {
+                string title = presets[i, 0];
+                string body = presets[i, 1];
+
+                float cardW = totalWidth - 20f;
+                float cardH = 48f;
+
+                GUI.Box(new Rect(10, curY, cardW, cardH), GUIContent.none, dropdownPanelStyle);
+
+                // Title & Body
+                GUI.Label(new Rect(22, curY + 4, cardW - 250, 18), $"<b>{title}</b>", brandLogoStyle ?? coordStyle);
+                GUI.Label(new Rect(22, curY + 24, cardW - 250, 20), $"<color=#B0C8DF>{body}</color>", hintStyle);
+
+                // Button 1: Paste to Textfield
+                if (GUI.Button(new Rect(cardW - 220, curY + 10, 100, 28), "📝 Pasang Teks", navBtnStyle))
+                {
+                    dispatchOutgoingMessage = body;
+                    dispatchModalTab = 0;
+                    ShowNotification("📝 Template dipasang ke kotak pesan.");
+                }
+
+                // Button 2: Send Immediately
+                if (GUI.Button(new Rect(cardW - 110, curY + 10, 100, 28), "🚀 Langsung Kirim", navBtnActiveStyle))
+                {
+                    FMSFleetMessenger.Instance?.SendFromControlRoom(dispatchSelectedUnitTarget, body, priority);
+                    dispatchModalTab = 0;
+                    ShowNotification($"🚀 Pesan terkirim ke {dispatchSelectedUnitTarget}!");
+                }
+
+                curY += 54f;
             }
 
-            // Live Audio Waveform Banner when transmitting
-            if (isTransmitting)
-            {
-                curY += 40;
-                string waveBars = (Time.time % 0.4f > 0.2f) ? " ▂ ▃ ▄ ▅ ▆ ▇ █ ▇ ▆ ▅ ▄ ▃ ▂ " : " █ ▇ ▆ ▅ ▄ ▃ ▂   ▂ ▃ ▄ ▅ ▆ ▇ █ ";
-                string targetName = dispatchSelectedUnitTarget == "ALL" ? "SELURUH ARMADA (BROADCAST)" : $"UNIT {dispatchSelectedUnitTarget}";
-                GUI.Box(new Rect(x + 20, curY, modalW - 40, 28), GUIContent.none, dropdownPanelStyle);
-                GUI.Label(new Rect(x + 26, curY + 4, modalW - 52, 20), 
-                    $"<color=#FF4D4D><b>🔴 LIVE AUDIO STREAM:</b></color> <color=#00E5FF>{waveBars}</color> Transmisi suara aktif ke <color=#00FFA3><b>{targetName}</b></color>", hintStyle);
-            }
+            return curY;
         }
 
         // =========================================================================
