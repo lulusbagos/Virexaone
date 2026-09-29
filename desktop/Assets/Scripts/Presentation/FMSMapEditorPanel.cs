@@ -168,8 +168,14 @@ namespace Virexa.FMS
                 wordWrap = true, normal = { textColor = Muted } };
             buttonStyle = new GUIStyle(GUI.skin.button) { font = font, fontSize = 11,
                 normal = { textColor = Ink }, hover = { textColor = Ink } };
-            fieldStyle = new GUIStyle(GUI.skin.textField) { font = font, fontSize = 11,
-                normal = { textColor = Ink } };
+            fieldStyle = new GUIStyle(GUI.skin.textField)
+            {
+                font = font,
+                fontSize = 11,
+                normal = { textColor = Ink },
+                focused = { textColor = Ink },
+                active = { textColor = Ink }
+            };
             Shader shader = Shader.Find("Sprites/Default") ?? Shader.Find("Unlit/Color");
             if (shader != null) lineMaterial = new Material(shader);
         }

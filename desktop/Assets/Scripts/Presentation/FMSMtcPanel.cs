@@ -309,7 +309,13 @@ namespace Virexa.FMS
             markerStyle.alignment = TextAnchor.MiddleCenter;
             buttonStyle = MakeStyle(font, 11, Ink, FontStyle.Bold);
             buttonStyle.alignment = TextAnchor.MiddleCenter;
-            inputStyle = new GUIStyle(GUI.skin.textField) { font = font, fontSize = 12, normal = { textColor = Ink } };
+            inputStyle = new GUIStyle(GUI.skin.textField)
+            {
+                fontSize = 12,
+                normal = { textColor = Ink },
+                focused = { textColor = Ink },
+                active = { textColor = Ink }
+            };
             warningStyle = MakeStyle(font, 10, Amber, FontStyle.Normal);
         }
 

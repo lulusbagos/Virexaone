@@ -291,12 +291,13 @@ namespace Virexa.FMS
                 LiveGpsFix a = liveGpsFixes[i - 1];
                 LiveGpsFix b = liveGpsFixes[i];
                 float seconds = (float)(b.recordedAtUtc - a.recordedAtUtc).TotalSeconds;
-                if (seconds > 0f && seconds <= 120f && FlatDistance(a.position, b.position) > 3f)
+                if (seconds > 0f && seconds <= 120f && FlatDistance(a.position, b.position) > 0.5f)
                 {
                     observedGap = Mathf.Max(observedGap, seconds);
                 }
             }
-            desiredPlaybackDelaySeconds = Mathf.Clamp(observedGap + 25f, 25f, 150f);
+            // Ultra-responsive GPS playback buffer (1.2s - 3.5s jitter absorption)
+            desiredPlaybackDelaySeconds = Mathf.Clamp(observedGap + 1.2f, 1.0f, 3.5f);
             if (!liveGpsInitialized) playbackDelaySeconds = desiredPlaybackDelaySeconds;
 
             float receiptRealtime = Time.realtimeSinceStartup;
@@ -319,11 +320,33 @@ namespace Virexa.FMS
             }
         }
 
+        private static Vector3 EvaluateCatmullRom(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
+        {
+            float t2 = t * t;
+            float t3 = t2 * t;
+            return 0.5f * (
+                (2f * p1) +
+                (-p0 + p2) * t +
+                (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 +
+                (-p0 + 3f * p1 - 3f * p2 + p3) * t3
+            );
+        }
+
+        private static Vector3 EvaluateCatmullRomTangent(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
+        {
+            float t2 = t * t;
+            return 0.5f * (
+                (-p0 + p2) +
+                2f * (2f * p0 - 5f * p1 + 4f * p2 - p3) * t +
+                3f * (-p0 + 3f * p1 - 3f * p2 + p3) * t2
+            );
+        }
+
         private void RenderLiveGpsPosition(float dt, bool initial = false)
         {
             if (liveGpsFixes.Count == 0 || serverUtcAtReceipt == DateTime.MinValue) return;
 
-            float delayRate = desiredPlaybackDelaySeconds > playbackDelaySeconds ? 0.5f : 0.15f;
+            float delayRate = desiredPlaybackDelaySeconds > playbackDelaySeconds ? 0.8f : 0.35f;
             playbackDelaySeconds = Mathf.MoveTowards(playbackDelaySeconds, desiredPlaybackDelaySeconds, dt * delayRate);
             DateTime serverNow = serverUtcAtReceipt.AddSeconds(Time.realtimeSinceStartup - localRealtimeAtReceipt);
             LiveGpsFix first = liveGpsFixes[0];
@@ -337,7 +360,7 @@ namespace Virexa.FMS
             else if (dt > 0f && playbackUtc < last.recordedAtUtc)
             {
                 float lagSeconds = (float)(targetPlayback - playbackUtc).TotalSeconds;
-                float playbackRate = Mathf.Clamp(1f + lagSeconds / 60f, 0.8f, 1.2f);
+                float playbackRate = Mathf.Clamp(1f + lagSeconds / 4f, 0.7f, 1.4f);
                 playbackUtc = playbackUtc.AddSeconds(dt * playbackRate);
                 if (playbackUtc > last.recordedAtUtc) playbackUtc = last.recordedAtUtc;
             }
@@ -346,13 +369,26 @@ namespace Virexa.FMS
             timeSinceLastGps = Mathf.Max(0f, (float)(serverNow - last.recordedAtUtc).TotalSeconds);
             backendLastHeardSeconds = Mathf.FloorToInt(timeSinceLastGps);
             if (timeSinceLastGps > 120f || secondsSinceLastBackendUpdate > 30f) isOnline = false;
+            
             Vector3 displayPos = first.position;
             Vector3 direction = Vector3.zero;
             float displayedSpeedKmh = 0f;
 
             if (displayAt >= last.recordedAtUtc)
             {
-                displayPos = last.position;
+                // Dead reckoning extrapolation if still rolling
+                if (lastKnownVelocityDirection.sqrMagnitude > 0.01f && currentSpeedKmh > 1.0f && (float)(displayAt - last.recordedAtUtc).TotalSeconds < 3.0f)
+                {
+                    float extraSec = (float)(displayAt - last.recordedAtUtc).TotalSeconds;
+                    float decayingSpeed = Mathf.Max(0f, currentSpeedKmh * (1f - extraSec / 3.0f));
+                    displayPos = last.position + lastKnownVelocityDirection.normalized * (decayingSpeed / 3.6f * extraSec);
+                    direction = lastKnownVelocityDirection;
+                    displayedSpeedKmh = decayingSpeed;
+                }
+                else
+                {
+                    displayPos = last.position;
+                }
             }
             else if (displayAt > first.recordedAtUtc)
             {
@@ -361,14 +397,34 @@ namespace Virexa.FMS
                     LiveGpsFix next = liveGpsFixes[i];
                     if (displayAt > next.recordedAtUtc) continue;
 
-                    LiveGpsFix previous = liveGpsFixes[i - 1];
-                    float duration = (float)(next.recordedAtUtc - previous.recordedAtUtc).TotalSeconds;
-                    if (duration <= 0f) break;
-                    float fraction = Mathf.Clamp01((float)(displayAt - previous.recordedAtUtc).TotalSeconds / duration);
-                    displayPos = Vector3.Lerp(previous.position, next.position, fraction);
-                    direction = next.position - previous.position;
+                    LiveGpsFix prev = liveGpsFixes[i - 1];
+                    float duration = (float)(next.recordedAtUtc - prev.recordedAtUtc).TotalSeconds;
+                    if (duration <= 0.001f) break;
+                    
+                    float fraction = Mathf.Clamp01((float)(displayAt - prev.recordedAtUtc).TotalSeconds / duration);
+                    
+                    // Catmull-Rom Spline Interpolation for organic, ultra-smooth curve tracking
+                    if (liveGpsFixes.Count >= 4)
+                    {
+                        LiveGpsFix p0 = (i - 2 >= 0) ? liveGpsFixes[i - 2] : prev;
+                        LiveGpsFix p1 = prev;
+                        LiveGpsFix p2 = next;
+                        LiveGpsFix p3 = (i + 1 < liveGpsFixes.Count) ? liveGpsFixes[i + 1] : next;
+
+                        displayPos = EvaluateCatmullRom(p0.position, p1.position, p2.position, p3.position, fraction);
+                        direction = EvaluateCatmullRomTangent(p0.position, p1.position, p2.position, p3.position, fraction);
+                    }
+                    else
+                    {
+                        // Hermite SmoothStep interpolation fallback
+                        float smoothT = Mathf.SmoothStep(0f, 1f, fraction);
+                        displayPos = Vector3.Lerp(prev.position, next.position, smoothT);
+                        direction = next.position - prev.position;
+                    }
+
                     direction.y = 0f;
-                    displayedSpeedKmh = direction.magnitude / duration * 3.6f;
+                    if (direction.sqrMagnitude > 0.001f) lastKnownVelocityDirection = direction.normalized;
+                    displayedSpeedKmh = (next.position - prev.position).magnitude / duration * 3.6f;
                     break;
                 }
             }
@@ -382,32 +438,49 @@ namespace Virexa.FMS
             else if (FlatDistance(transform.position, displayPos) < 25f)
                 totalDistanceKm += FlatDistance(transform.position, displayPos) * 0.001f;
 
-            if (!initial) displayPos.y = transform.position.y;
-            transform.position = displayPos;
-            currentSpeedKmh = displayedSpeedKmh;
+            // Smooth position movement and ground terrain tracking
+            if (!initial)
+            {
+                float smoothSpeed = Mathf.Max(6f, displayedSpeedKmh * 0.35f);
+                transform.position = Vector3.Lerp(transform.position, displayPos, Mathf.Clamp01(dt * smoothSpeed));
+                AlignToGround(instant: false);
+            }
+            else
+            {
+                transform.position = displayPos;
+                AlignToGround(instant: true);
+            }
+
+            currentSpeedKmh = Mathf.Lerp(currentSpeedKmh, displayedSpeedKmh, dt * 8f);
             targetSpeedKmh = displayedSpeedKmh;
+            
             bool excavating = unitType == UnitType.Excavator && !string.IsNullOrEmpty(activityName) &&
                 (activityName.IndexOf("Loading", StringComparison.OrdinalIgnoreCase) >= 0 ||
                  activityName.IndexOf("Digging", StringComparison.OrdinalIgnoreCase) >= 0);
+            
             UnitState nextState = !isOnline ? UnitState.Offline
                 : unitType == UnitType.Excavator
-                    ? displayedSpeedKmh > 0.5f ? UnitState.TravellingToLoad : excavating ? UnitState.Loading : UnitState.Idle
-                    : displayedSpeedKmh > 0.5f ? UnitState.Hauling : UnitState.Idle;
+                    ? currentSpeedKmh > 0.5f ? UnitState.TravellingToLoad : excavating ? UnitState.Loading : UnitState.Idle
+                    : currentSpeedKmh > 0.5f ? UnitState.Hauling : UnitState.Idle;
+            
             if (currentState != nextState)
             {
                 currentState = nextState;
                 UpdateStatusColor();
             }
-            if (direction.sqrMagnitude > 0.01f && displayedSpeedKmh > 0.5f)
+
+            // Smooth rotation & steering interpolation
+            if (direction.sqrMagnitude > 0.01f && currentSpeedKmh > 0.4f)
             {
-                Quaternion rotation = Quaternion.LookRotation(direction, Vector3.up);
-                transform.rotation = initial ? rotation : Quaternion.Slerp(transform.rotation, rotation, dt * steeringSmoothSpeed);
+                Quaternion targetRotation = Quaternion.LookRotation(direction, Vector3.up);
+                float steerSpeed = Mathf.Max(steeringSmoothSpeed, 6.5f);
+                transform.rotation = initial ? targetRotation : Quaternion.Slerp(transform.rotation, targetRotation, Mathf.Clamp01(dt * steerSpeed));
                 headingDegrees = transform.eulerAngles.y;
             }
             else if (unitType == UnitType.Excavator && isOnline && last.headingDeg > 0.1f && last.headingDeg < 360f)
             {
-                Quaternion rotation = Quaternion.Euler(0f, last.headingDeg, 0f);
-                transform.rotation = initial ? rotation : Quaternion.Slerp(transform.rotation, rotation, dt * steeringSmoothSpeed);
+                Quaternion targetRotation = Quaternion.Euler(0f, last.headingDeg, 0f);
+                transform.rotation = initial ? targetRotation : Quaternion.Slerp(transform.rotation, targetRotation, Mathf.Clamp01(dt * 5.0f));
                 headingDegrees = transform.eulerAngles.y;
             }
         }

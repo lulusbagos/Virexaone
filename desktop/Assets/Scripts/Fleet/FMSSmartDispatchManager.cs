@@ -82,9 +82,12 @@ namespace Virexa.FMS
         private void Update()
         {
             // Toggle Dispatch HUD shortcut [Q]
-            if (Input.GetKeyDown(KeyCode.Q))
+            if (GUIUtility.keyboardControl == 0 && (FMSDashboardUI.Instance == null || !FMSDashboardUI.Instance.HasBlockingModal))
             {
-                ToggleDispatchHUD();
+                if (Input.GetKeyDown(KeyCode.Q))
+                {
+                    ToggleDispatchHUD();
+                }
             }
 
             refreshTimer += Time.deltaTime;

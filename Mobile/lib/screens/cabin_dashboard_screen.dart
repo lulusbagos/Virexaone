@@ -23,11 +23,17 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
     with TickerProviderStateMixin {
   late AnimationController _animController;
   late AnimationController _bearingController;
+  late AnimationController _motionController;
   double _bearingFrom = 0;
   double _bearingTo = 0;
   bool _bearingReady = false;
   String _bearingUnit = '';
   String _bearingTarget = '';
+  double _eastingFrom = 0, _eastingTo = 0;
+  double _northingFrom = 0, _northingTo = 0;
+  double _headingFrom = 0, _headingTo = 0;
+  double _azimuthFrom = 0, _azimuthTo = 0;
+  bool _motionReady = false;
   final FmsApiService _api = FmsApiService();
   Timer? _clockTimer;
   String _currentTimeStr = '';
@@ -46,6 +52,10 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
       vsync: this,
       duration: const Duration(milliseconds: 700),
     );
+    _motionController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 950),
+    );
 
     _updateTime();
     _clockTimer = Timer.periodic(
@@ -59,22 +69,55 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
     if (!mounted) return;
     if (!_api.hasNavigationFix) {
       _bearingReady = false;
+      _motionReady = false;
       _bearingController.stop();
+      _motionController.stop();
     } else {
       final next = _api.relativeBearingDegrees;
+      final nextE = _api.hdEasting;
+      final nextN = _api.hdNorthing;
+      final nextH = _api.hdHeadingDeg;
+      final nextAz = _api.absoluteTargetAzimuth;
+
       if (!_bearingReady ||
+          !_motionReady ||
           _bearingUnit != _api.selectedUnitId ||
           _bearingTarget != _api.activeTargetName) {
         _bearingFrom = next;
         _bearingTo = next;
+        _eastingFrom = _eastingTo = nextE;
+        _northingFrom = _northingTo = nextN;
+        _headingFrom = _headingTo = nextH;
+        _azimuthFrom = _azimuthTo = nextAz;
         _bearingReady = true;
+        _motionReady = true;
         _bearingUnit = _api.selectedUnitId;
         _bearingTarget = _api.activeTargetName;
         _bearingController.stop();
+        _motionController.stop();
       } else {
+        // Smooth GPS motion & heading
+        final currE = _visualEasting;
+        final currN = _visualNorthing;
+        final currH = _visualHeading;
+        final currAz = _visualAzimuth;
+        final hTurn = (nextH - currH + 540) % 360 - 180;
+        final azTurn = (nextAz - currAz + 540) % 360 - 180;
+
+        _eastingFrom = currE;
+        _eastingTo = nextE;
+        _northingFrom = currN;
+        _northingTo = nextN;
+        _headingFrom = currH;
+        _headingTo = currH + hTurn;
+        _azimuthFrom = currAz;
+        _azimuthTo = currAz + azTurn;
+        _motionController.forward(from: 0);
+
+        // Smooth relative bearing
         final current = _visualBearing;
         final turn = (next - current + 540) % 360 - 180;
-        if (turn.abs() > 0.5) {
+        if (turn.abs() > 0.3) {
           _bearingFrom = current;
           _bearingTo = current + turn;
           _bearingController.forward(from: 0);
@@ -89,6 +132,30 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
       (_bearingTo - _bearingFrom) *
           Curves.easeOutCubic.transform(_bearingController.value);
 
+  double get _visualEasting =>
+      _eastingFrom +
+      (_eastingTo - _eastingFrom) *
+          Curves.easeOutQuad.transform(_motionController.value);
+
+  double get _visualNorthing =>
+      _northingFrom +
+      (_northingTo - _northingFrom) *
+          Curves.easeOutQuad.transform(_motionController.value);
+
+  double get _visualHeading =>
+      (_headingFrom +
+          (_headingTo - _headingFrom) *
+              Curves.easeOutQuad.transform(_motionController.value) +
+          360) %
+      360;
+
+  double get _visualAzimuth =>
+      (_azimuthFrom +
+          (_azimuthTo - _azimuthFrom) *
+              Curves.easeOutQuad.transform(_motionController.value) +
+          360) %
+      360;
+
   void _updateTime() {
     if (mounted) {
       setState(() {
@@ -102,6 +169,7 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
     _clockTimer?.cancel();
     _animController.dispose();
     _bearingController.dispose();
+    _motionController.dispose();
     _api.removeListener(_onApiUpdate);
     super.dispose();
   }
@@ -774,6 +842,7 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
                     animation: Listenable.merge([
                       _animController,
                       _bearingController,
+                      _motionController,
                     ]),
                     builder: (context, child) {
                       return Opacity(
@@ -784,8 +853,12 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
                                   relativeBearing: _bearingReady
                                       ? _visualBearing
                                       : _api.relativeBearingDegrees,
-                                  absoluteHeading: _api.hdHeadingDeg,
-                                  targetAzimuth: _api.absoluteTargetAzimuth,
+                                  absoluteHeading: _motionReady
+                                      ? _visualHeading
+                                      : _api.hdHeadingDeg,
+                                  targetAzimuth: _motionReady
+                                      ? _visualAzimuth
+                                      : _api.absoluteTargetAzimuth,
                                   animPhase: _animController.value,
                                   nearbyVehicles: _api.nearbyVehicles,
                                 )
@@ -793,9 +866,9 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
                                   track: _api.gpsTrack,
                                   roadSegments: _api.roadSegments,
                                   nearbyVehicles: _api.nearbyVehicles,
-                                  easting: _api.hdEasting,
-                                  northing: _api.hdNorthing,
-                                  heading: _api.hdHeadingDeg,
+                                  easting: _motionReady ? _visualEasting : _api.hdEasting,
+                                  northing: _motionReady ? _visualNorthing : _api.hdNorthing,
+                                  heading: _motionReady ? _visualHeading : _api.hdHeadingDeg,
                                   targetEasting: _api.targetEasting,
                                   targetNorthing: _api.targetNorthing,
                                   targetName: _api.activeTargetName,

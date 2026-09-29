@@ -183,7 +183,8 @@ namespace Virexa.FMS
 
         private void HandleKeyboardInput()
         {
-            if (FMSDashboardUI.Instance != null && FMSDashboardUI.Instance.IsMapEditorOpen) return;
+            if (GUIUtility.keyboardControl != 0) return;
+            if (FMSDashboardUI.Instance != null && (FMSDashboardUI.Instance.IsMapEditorOpen || FMSDashboardUI.Instance.HasBlockingModal)) return;
             float dt = Time.unscaledDeltaTime;
             float speed = keyboardPanSpeed * (Input.GetKey(KeyCode.LeftShift) ? fastMultiplier : 1f);
 

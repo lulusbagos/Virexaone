@@ -101,7 +101,7 @@ namespace Virexa.FMS
         private Vector2 weatherReportScroll;
         public bool showUnitOverheadTags = true;
         public bool showCommandPalette = false;
-        private bool focusCommandInputNextFrame = false;
+        private int focusCommandInputFrames = 0;
         private string commandPaletteQuery = "";
         private Vector2 commandPaletteScroll = Vector2.zero;
         private int sunCycleIndex = 0;
@@ -199,6 +199,7 @@ namespace Virexa.FMS
         private string dispatchUnitSearchQuery = "";
         private int dispatchPriorityIndex = 0; // 0: Normal, 1: Urgent, 2: Emergency
         private string dispatchTargetCategory = "ALL"; // "ALL", "FLEET_HAULER", "FLEET_EXCAVATOR", "FLEET_SUPPORT", "SINGLE_UNIT"
+        private int focusRadioChatFrames = 0;
 
         // Location Filter Modal State
         private string locationSearchQuery = "";
@@ -405,8 +406,40 @@ namespace Virexa.FMS
             EnsureSmartDispatchManager();
             EnsureUnitCctvManager();
             EnsureFtwSaveraManager();
+            EnsureFleetMessenger();
             if (FMSWeatherController.Instance == null) gameObject.AddComponent<FMSWeatherController>();
             FMSFleetMessenger.OnNotificationRequested = (msg) => ShowNotification(msg);
+        }
+
+        public void EnsureFleetMessenger()
+        {
+            if (FMSFleetMessenger.Instance == null)
+            {
+                var existing = FindFirstObjectByType<FMSFleetMessenger>();
+                if (existing == null)
+                {
+                    var go = new GameObject("--- FMS_FLEET_MESSENGER ---");
+                    go.AddComponent<FMSFleetMessenger>();
+                }
+            }
+        }
+
+        public void OpenDispatchRadioForUnit(string unitId)
+        {
+            EnsureFleetMessenger();
+            if (string.IsNullOrEmpty(unitId) || unitId == "ALL")
+            {
+                dispatchSelectedUnitTarget = "ALL";
+                dispatchTargetCategory = "ALL";
+            }
+            else
+            {
+                dispatchSelectedUnitTarget = unitId;
+                dispatchTargetCategory = "SINGLE_UNIT";
+            }
+            showDispatchRadioModal = true;
+            focusRadioChatFrames = 3;
+            ShowNotification($"📻 Radio Komunikasi ke {(dispatchSelectedUnitTarget == "ALL" ? "Seluruh Armada" : $"Unit {dispatchSelectedUnitTarget}")} Dibuka");
         }
 
         public void EnsureFtwSaveraManager()
@@ -514,6 +547,7 @@ namespace Virexa.FMS
         private Texture2D rowInactiveTex;
         private Texture2D rowRoadActiveTex;
         private Texture2D splashCardBgTex;
+        private Texture2D searchInputBgTex;
         private Texture2D splashSubCardBgTex;
         private Texture2D splashGlowCyanTex;
         private Texture2D splashGlowEmeraldTex;
@@ -619,6 +653,7 @@ namespace Virexa.FMS
             if (splashGlowEmeraldTex == null) splashGlowEmeraldTex = MakeTex(2, 2, new Color(0.0f, 1.0f, 0.64f, 0.85f));
             if (splashAlertBgTex == null) splashAlertBgTex = MakeTex(2, 2, new Color(0.16f, 0.03f, 0.04f, 0.95f));
             if (splashAlertBorderTex == null) splashAlertBorderTex = MakeTex(2, 2, new Color(1.0f, 0.35f, 0.35f, 0.85f));
+            if (searchInputBgTex == null) searchInputBgTex = MakeTex(2, 2, new Color(0.04f, 0.08f, 0.15f, 0.95f));
 
             // Unit 3D Overhead Floating Tag Textures (Aerospace Obsidian Cyber Theme)
             if (tagBgNormalTex == null) tagBgNormalTex = MakeGradientTex(26, new Color(0.05f, 0.08f, 0.15f, 0.94f), new Color(0.02f, 0.04f, 0.09f, 0.96f));
@@ -923,12 +958,26 @@ namespace Virexa.FMS
                 };
             }
 
+            if (searchInputBgTex == null) searchInputBgTex = MakeTex(2, 2, new Color(0.04f, 0.08f, 0.15f, 0.95f));
+
             if (searchBoxStyle == null && GUI.skin != null && GUI.skin.textField != null)
             {
-                searchBoxStyle = new GUIStyle(GUI.skin.textField);
-                searchBoxStyle.fontSize = 13;
-                if (searchBoxStyle.normal != null) searchBoxStyle.normal.textColor = Color.white;
-                searchBoxStyle.padding = new RectOffset(8, 8, 6, 6);
+                searchBoxStyle = new GUIStyle(GUI.skin.textField)
+                {
+                    fontSize = 12,
+                    alignment = TextAnchor.MiddleLeft
+                };
+                searchBoxStyle.padding = new RectOffset(8, 8, 4, 4);
+                if (searchBoxStyle.normal != null) { searchBoxStyle.normal.textColor = Color.white; searchBoxStyle.normal.background = searchInputBgTex; }
+                if (searchBoxStyle.focused != null) { searchBoxStyle.focused.textColor = Color.white; searchBoxStyle.focused.background = searchInputBgTex; }
+                if (searchBoxStyle.active != null) { searchBoxStyle.active.textColor = Color.white; searchBoxStyle.active.background = searchInputBgTex; }
+                if (searchBoxStyle.hover != null) { searchBoxStyle.hover.textColor = Color.white; searchBoxStyle.hover.background = searchInputBgTex; }
+            }
+            if (GUI.skin != null && GUI.skin.settings != null)
+            {
+                GUI.skin.settings.cursorColor = Color.white;
+                GUI.skin.settings.cursorFlashSpeed = 0.8f;
+                GUI.skin.settings.selectionColor = new Color(0f, 0.7f, 1f, 0.5f);
             }
 
             if (tabBtnStyle == null)
@@ -1132,7 +1181,7 @@ namespace Virexa.FMS
                 if (badgeSuccessStyle != null) badgeSuccessStyle.font = poppins;
                 if (badgeOfflineStyle != null) badgeOfflineStyle.font = poppins;
                 if (modalBoxStyle != null) modalBoxStyle.font = poppins;
-                if (searchBoxStyle != null) searchBoxStyle.font = poppins;
+                // keep searchBoxStyle font safe to avoid TextEditor NullReferenceException on desktop
                 if (tabBtnStyle != null) tabBtnStyle.font = poppins;
                 if (tabBtnActiveStyle != null) tabBtnActiveStyle.font = poppins;
                 if (scaleLabelStyle != null) scaleLabelStyle.font = poppins;
@@ -1352,19 +1401,15 @@ namespace Virexa.FMS
                     }
                 }
 
-                // [Ctrl + F], [F3], [Ctrl + K], [K] or [/] Toggle Unit Search & Command Palette
+                // [Ctrl + F], [F3], [Ctrl + K] Toggle Unit Search & Command Palette
                 if (Input.GetKeyDown(KeyCode.F3) ||
-                    (Input.GetKey(KeyCode.LeftControl) && Input.GetKeyDown(KeyCode.F)) ||
-                    (Input.GetKey(KeyCode.RightControl) && Input.GetKeyDown(KeyCode.F)) ||
-                    Input.GetKeyDown(KeyCode.K) || 
-                    (Input.GetKey(KeyCode.LeftControl) && Input.GetKeyDown(KeyCode.K)) || 
-                    Input.GetKeyDown(KeyCode.Slash))
+                    ((Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) && (Input.GetKeyDown(KeyCode.F) || Input.GetKeyDown(KeyCode.K))))
                 {
                     showCommandPalette = !showCommandPalette;
                     if (showCommandPalette)
                     {
                         commandPaletteQuery = "";
-                        focusCommandInputNextFrame = true;
+                        focusCommandInputFrames = 3;
                         ShowNotification("🔍 Cari Unit Tambang, Lokasi, atau Jalan (Ketik Kode Unit / Nama / Opr)");
                     }
                 }
@@ -1846,6 +1891,23 @@ namespace Virexa.FMS
             // GROUP 3: HELP & SUPPORT
             helpBtnX = curX;
             curX = DrawMenuButton("Bantuan", ActiveMenu.Help, curX, 70);
+
+            // GROUP 4: QUICK SEARCH BUTTON IN TOP NAV
+            if (w >= 900f)
+            {
+                float searchBtnW = compactNav ? 115f : 165f;
+                string searchLabel = compactNav ? "🔍 Cari [Ctrl+F]" : "🔍 Cari Unit / Lokasi [Ctrl+F]";
+                if (GUI.Button(new Rect(curX, 8, searchBtnW, 28), searchLabel, showCommandPalette ? navBtnActiveStyle : navBtnStyle))
+                {
+                    showCommandPalette = !showCommandPalette;
+                    if (showCommandPalette)
+                    {
+                        commandPaletteQuery = "";
+                        focusCommandInputFrames = 3;
+                    }
+                }
+                curX += searchBtnW + 8f;
+            }
 
             // Center: Coordinate HUD
             bool narrowNav = w < 950f;
@@ -3081,7 +3143,7 @@ namespace Virexa.FMS
                 if (showCommandPalette)
                 {
                     commandPaletteQuery = "";
-                    focusCommandInputNextFrame = true;
+                    focusCommandInputFrames = 3;
                 }
                 currentMenu = ActiveMenu.None;
             }
@@ -3346,7 +3408,7 @@ namespace Virexa.FMS
                 if (showCommandPalette)
                 {
                     commandPaletteQuery = "";
-                    focusCommandInputNextFrame = true;
+                    focusCommandInputFrames = 3;
                 }
             }
         }
@@ -3652,10 +3714,10 @@ namespace Virexa.FMS
             {
                 GUI.SetNextControlName("CommandPaletteInput");
                 commandPaletteQuery = GUI.TextField(new Rect(x + 16, y + 36, palW - 32, 28), commandPaletteQuery, tfStyle);
-                if (focusCommandInputNextFrame)
+                if (focusCommandInputFrames > 0)
                 {
                     GUI.FocusControl("CommandPaletteInput");
-                    focusCommandInputNextFrame = false;
+                    focusCommandInputFrames--;
                 }
             }
             catch (System.Exception)
@@ -3783,6 +3845,18 @@ namespace Virexa.FMS
                 }
             }
 
+            // Handle Enter key to execute first matched search result
+            Event currentEvent = Event.current;
+            if (currentEvent != null && currentEvent.type == EventType.KeyDown && (currentEvent.keyCode == KeyCode.Return || currentEvent.keyCode == KeyCode.KeypadEnter))
+            {
+                if (results.Count > 0)
+                {
+                    results[0].Value?.Invoke();
+                    showCommandPalette = false;
+                    currentEvent.Use();
+                }
+            }
+
             // Draw scroll list
             float totalContentH = results.Count * 28f;
             commandPaletteScroll = GUI.BeginScrollView(viewRect, commandPaletteScroll, new Rect(0, 0, palW - 55, totalContentH));
@@ -3800,7 +3874,7 @@ namespace Virexa.FMS
             GUI.EndScrollView();
 
             // Bottom Footer
-            GUI.Label(new Rect(x + 16, y + palH - 30, palW - 120, 20), "💡 <i>Tekan [Esc] untuk menutup | Klik unit / lokasi untuk fokus kamera</i>", hintStyle);
+            GUI.Label(new Rect(x + 16, y + palH - 30, palW - 120, 20), "💡 <i>Tekan [Enter] untuk pilih teratas | [Esc] untuk menutup | Klik unit untuk fokus</i>", hintStyle);
             if (GUI.Button(new Rect(x + palW - 90, y + palH - 32, 74, 24), "Tutup", navBtnStyle))
             {
                 showCommandPalette = false;
@@ -5434,8 +5508,7 @@ namespace Virexa.FMS
             // 2. Open Full Radio Messenger Modal
             if (GUI.Button(new Rect(menuX + 16 + rHalfW, radY, rHalfW, 32), "💬 Radio Chat [F9]", navBtnStyle))
             {
-                dispatchSelectedUnitTarget = unit.unitId;
-                showDispatchRadioModal = true;
+                OpenDispatchRadioForUnit(unit.unitId);
                 FMSFleetManager.Instance.CloseContextMenu();
             }
             curY += secRadioH + 6f;
@@ -6259,7 +6332,13 @@ namespace Virexa.FMS
                 float textInputW = modalW - 40 - pttBtnW - sendBtnW - 16;
 
                 GUI.Box(new Rect(x + 20, curY, textInputW, 36), GUIContent.none, dropdownPanelStyle);
+                GUI.SetNextControlName("DispatchChatInput");
                 dispatchOutgoingMessage = GUI.TextField(new Rect(x + 26, curY + 6, textInputW - 12, 24), dispatchOutgoingMessage ?? "", searchBoxStyle ?? GUI.skin.textField);
+                if (focusRadioChatFrames > 0)
+                {
+                    GUI.FocusControl("DispatchChatInput");
+                    focusRadioChatFrames--;
+                }
 
                 // Handle keyboard Enter to send
                 Event curEvent = Event.current;
@@ -6269,6 +6348,7 @@ namespace Virexa.FMS
                     {
                         var pri = dispatchPriorityIndex == 1 ? FMSFleetMessenger.MessagePriority.Urgent :
                                  (dispatchPriorityIndex == 2 ? FMSFleetMessenger.MessagePriority.Emergency : FMSFleetMessenger.MessagePriority.Normal);
+                        EnsureFleetMessenger();
                         FMSFleetMessenger.Instance?.SendFromControlRoom(dispatchSelectedUnitTarget, dispatchOutgoingMessage, pri);
                         dispatchOutgoingMessage = "";
                         curEvent.Use();
@@ -6281,18 +6361,23 @@ namespace Virexa.FMS
                     {
                         var pri = dispatchPriorityIndex == 1 ? FMSFleetMessenger.MessagePriority.Urgent :
                                  (dispatchPriorityIndex == 2 ? FMSFleetMessenger.MessagePriority.Emergency : FMSFleetMessenger.MessagePriority.Normal);
+                        EnsureFleetMessenger();
                         FMSFleetMessenger.Instance?.SendFromControlRoom(dispatchSelectedUnitTarget, dispatchOutgoingMessage, pri);
                         dispatchOutgoingMessage = "";
                     }
                 }
 
                 // Push-to-Talk Talkback Button
+                EnsureFleetMessenger();
                 bool isTransmitting = FMSFleetMessenger.Instance != null && FMSFleetMessenger.Instance.isTalkbackActive;
                 string pttLabel = isTransmitting ? $"🔴 ON-AIR ({FMSFleetMessenger.Instance.talkbackDuration:F1}s)" : "🎙️ TALKBACK (PTT)";
                 GUIStyle pttStyle = isTransmitting ? navBtnActiveStyle : navBtnStyle;
 
+                Color prevGuiColor = GUI.color;
+                if (isTransmitting) GUI.color = new Color(1.0f, 0.35f, 0.35f);
                 if (GUI.Button(new Rect(x + 36 + textInputW + sendBtnW, curY, pttBtnW, 36), pttLabel, pttStyle))
                 {
+                    EnsureFleetMessenger();
                     if (FMSFleetMessenger.Instance != null)
                     {
                         if (!FMSFleetMessenger.Instance.isTalkbackActive)
@@ -6301,6 +6386,7 @@ namespace Virexa.FMS
                             FMSFleetMessenger.Instance.StopTalkback();
                     }
                 }
+                GUI.color = prevGuiColor;
             }
             // =========================================================================
             // TAB 1: QUICK DISPATCH PRESETS & 1-CLICK MACROS
@@ -8030,6 +8116,7 @@ namespace Virexa.FMS
             SafeDestroyTexture(ref splashCardBgTex);
             SafeDestroyTexture(ref splashAlertBgTex);
             SafeDestroyTexture(ref splashAlertBorderTex);
+            SafeDestroyTexture(ref searchInputBgTex);
             SafeDestroyTexture(ref tagBgNormalTex);
             SafeDestroyTexture(ref tagBgSelectedTex);
             SafeDestroyTexture(ref tagBgOfflineTex);

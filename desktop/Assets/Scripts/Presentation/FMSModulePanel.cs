@@ -139,7 +139,13 @@ namespace Virexa.FMS
                 alignment = TextAnchor.MiddleCenter,
                 normal = { textColor = Ink }, hover = { textColor = Ink }
             };
-            inputStyle = new GUIStyle(GUI.skin.textField) { font = font, fontSize = 12, normal = { textColor = Ink } };
+            inputStyle = new GUIStyle(GUI.skin.textField)
+            {
+                fontSize = 12,
+                normal = { textColor = Ink },
+                focused = { textColor = Ink },
+                active = { textColor = Ink }
+            };
         }
 
         private static GUIStyle Label(Font font, int size, Color color, FontStyle weight)

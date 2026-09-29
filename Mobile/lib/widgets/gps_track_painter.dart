@@ -289,17 +289,29 @@ class GpsTrackPainter extends CustomPainter {
 
         final label = TextPainter(
           text: TextSpan(
-            text: '   m',
-            style: const TextStyle(
-              color: Color(0xFFE5F2F3),
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-            ),
+            children: [
+              TextSpan(
+                text: '${unit.unitName} ',
+                style: TextStyle(
+                  color: color,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              TextSpan(
+                text: '${unit.distanceMeters.round()}m',
+                style: const TextStyle(
+                  color: Color(0xFFE5F2F3),
+                  fontSize: 9.0,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
           textDirection: TextDirection.ltr,
           maxLines: 1,
           ellipsis: '...',
-        )..layout(maxWidth: math.max(40, math.min(110, size.width - 48)));
+        )..layout(maxWidth: math.max(60, math.min(130, size.width - 48)));
         final labelWidth = label.width + 12;
         final labelHeight = label.height + 8;
         final x = point.dx + 11 + labelWidth <= size.width - 8

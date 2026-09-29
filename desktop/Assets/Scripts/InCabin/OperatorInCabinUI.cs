@@ -58,6 +58,7 @@ namespace Virexa.FMS.Mobile
         public string dispatchAlertText = "";
         public string dispatchNewTarget = "";
         public string customReplyText = "";
+        public string inCabinCustomMessage = "";
         public string currentDelayReason = "";
         public bool isUnderDelay = false;
 
@@ -1141,19 +1142,28 @@ namespace Virexa.FMS.Mobile
             curY += btnH + btnGap;
 
             // 2. [ 🎙️ TALKBACK ] Green/Red PTT Card
+            EnsureFleetMessenger();
             bool isCabinTalking = FMSFleetMessenger.Instance != null && FMSFleetMessenger.Instance.isCabinTalkbackActive;
             Rect pttRect = new Rect(x + 6, curY, w - 12, btnH);
 
             if (isCabinTalking)
             {
                 if (btn3DRedTex != null) GUI.DrawTexture(pttRect, btn3DRedTex);
+                else
+                {
+                    Color prev = GUI.color;
+                    GUI.color = new Color(1.0f, 0.2f, 0.2f);
+                    GUI.Box(pttRect, GUIContent.none);
+                    GUI.color = prev;
+                }
                 GUI.Label(new Rect(pttRect.x + 14, pttRect.y + (btnH * 0.16f), pttRect.width - 24, 20), "🔴  <b>ON-AIR</b>", cardTitleBoldStyle);
                 GUI.Label(new Rect(pttRect.x + 14, pttRect.y + (btnH * 0.52f), pttRect.width - 24, 16), $"Transmitting ({FMSFleetMessenger.Instance.cabinTalkbackDuration:F1}s)", cardSublabelStyle);
 
                 if (GUI.Button(pttRect, GUIContent.none, GUIStyle.none))
                 {
                     OperatorAudioFeedbackManager.Instance?.PlayButtonClick();
-                    FMSFleetMessenger.Instance.StopCabinTalkback();
+                    EnsureFleetMessenger();
+                    FMSFleetMessenger.Instance?.StopCabinTalkback();
                 }
             }
             else
@@ -1165,6 +1175,7 @@ namespace Virexa.FMS.Mobile
                 if (GUI.Button(pttRect, GUIContent.none, GUIStyle.none))
                 {
                     OperatorAudioFeedbackManager.Instance?.PlayButtonClick();
+                    EnsureFleetMessenger();
                     FMSFleetMessenger.Instance?.StartCabinTalkback(selectedUnitId, operatorName);
                 }
             }
@@ -1264,6 +1275,70 @@ namespace Virexa.FMS.Mobile
                 GUI.color = new Color(0.0f, 1.0f, 0.65f, pAlpha * 0.65f);
                 GUI.Label(new Rect(centerX - 30, py, 60, 20), "▲ ▲ ▲", topHeaderCenterStyle);
                 GUI.color = oldColor;
+            }
+
+            // =====================================================================
+            // 2.5 HOLOGRAPHIC SURROUNDING UNITS & RADAR TARGETS (within 500m)
+            // =====================================================================
+            FMSUnitController myUnit = FMSFleetManager.Instance != null 
+                ? (FMSFleetManager.Instance.GetUnitById(selectedUnitId) ?? FMSFleetManager.Instance.selectedUnit) 
+                : null;
+            
+            if (myUnit != null && FMSFleetManager.Instance != null && FMSFleetManager.Instance.activeFleet != null)
+            {
+                Vector3 myPos = myUnit.transform.position;
+                float myYaw = myUnit.transform.eulerAngles.y;
+                float radarRadius = 450f;
+
+                foreach (var other in FMSFleetManager.Instance.activeFleet)
+                {
+                    if (other == null || other == myUnit) continue;
+                    Vector3 delta = other.transform.position - myPos;
+                    float dist = delta.magnitude;
+                    if (dist > radarRadius || dist < 0.1f) continue;
+
+                    // Rotate into vehicle-centric "Heading-Up" coordinates
+                    Vector3 localDelta = Quaternion.Euler(0, -myYaw, 0) * delta;
+                    float normX = localDelta.x / radarRadius;
+                    float normY = -localDelta.z / radarRadius; // +Z forward -> -Y on screen
+
+                    float blipX = centerX + normX * (ringSize * 0.44f);
+                    float blipY = centerY + normY * (ringSize * 0.44f);
+
+                    string icon = other.unitType switch
+                    {
+                        UnitType.HaulTruck => "🚚",
+                        UnitType.Excavator => "⛏️",
+                        UnitType.Bulldozer => "🚜",
+                        UnitType.Grader => "🚜",
+                        UnitType.WheelLoader => "🚜",
+                        UnitType.FuelTruck => "⛽",
+                        _ => "🚛"
+                    };
+
+                    bool isHazardProximity = dist < 35f;
+                    string badgeColor = isHazardProximity ? "#FF3B30" : (other.unitType == UnitType.Excavator ? "#00E5FF" : "#00FFA3");
+                    
+                    float blipW = 74f;
+                    float blipH = 28f;
+                    Rect blipRect = new Rect(blipX - blipW / 2f, blipY - 14f, blipW, blipH);
+
+                    if (isHazardProximity)
+                    {
+                        float pulseScale = 1.0f + 0.35f * Mathf.Sin(Time.time * 14f);
+                        Rect warnRing = new Rect(blipX - 18f * pulseScale, blipY - 18f * pulseScale, 36f * pulseScale, 36f * pulseScale);
+                        Color oldC = GUI.color;
+                        GUI.color = new Color(1f, 0.2f, 0.2f, 0.85f);
+                        if (roundNotificationBadgeTex != null) GUI.DrawTexture(warnRing, roundNotificationBadgeTex);
+                        GUI.color = oldC;
+                    }
+
+                    if (glassPillTex != null) GUI.DrawTexture(blipRect, glassPillTex);
+                    GUI.Label(new Rect(blipRect.x + 2, blipRect.y + 1, blipRect.width - 4, 14), 
+                        $"{icon} <color={badgeColor}><b>{other.unitId}</b></color>", bottomStatusPillStyle);
+                    GUI.Label(new Rect(blipRect.x + 2, blipRect.y + 14, blipRect.width - 4, 12), 
+                        $"<color=#B0C8DF>{dist:F0}m | {other.currentSpeedKmh:F0}k</color>", cardSublabelStyle);
+                }
             }
 
             // =====================================================================
@@ -1495,10 +1570,11 @@ namespace Virexa.FMS.Mobile
             qy += 38f;
 
             // Message Scroll Area
-            float chatH = modalH - (qy - my) - 60f;
+            float chatH = modalH - (qy - my) - 95f;
             Rect chatAreaRect = new Rect(mx + 16, qy, modalW - 32, chatH);
             if (glassHeader3DTex != null) GUI.DrawTexture(chatAreaRect, glassHeader3DTex);
 
+            EnsureFleetMessenger();
             var messages = FMSFleetMessenger.Instance != null ? FMSFleetMessenger.Instance.GetMessagesForUnit(selectedUnitId) : new List<FMSFleetMessenger.ChatMessage>();
 
             GUILayout.BeginArea(chatAreaRect);
@@ -1526,11 +1602,40 @@ namespace Virexa.FMS.Mobile
             GUILayout.EndScrollView();
             GUILayout.EndArea();
 
+            // Custom Message Input Row
+            float inputY = my + modalH - 84f;
+            float sendW = 100f;
+            float inputW = modalW - 32f - sendW - 8f;
+            
+            inCabinCustomMessage = GUI.TextField(new Rect(mx + 16, inputY, inputW, 32), inCabinCustomMessage ?? "", keypadBtnStyle);
+            if (GUI.Button(new Rect(mx + 24 + inputW, inputY, sendW, 32), "KIRIM 📨", btnKeyGreenStyle ?? keypadBtnStyle))
+            {
+                if (!string.IsNullOrWhiteSpace(inCabinCustomMessage))
+                {
+                    EnsureFleetMessenger();
+                    FMSFleetMessenger.Instance?.SendFromCabin(selectedUnitId, operatorName, inCabinCustomMessage, FMSFleetMessenger.MessagePriority.Normal);
+                    inCabinCustomMessage = "";
+                }
+            }
+
             // Bottom Close
             float btmY = my + modalH - 44f;
             if (GUI.Button(new Rect(mx + 16, btmY, modalW - 32, 34), "TUTUP WINDOW CHAT", keypadBtnStyle))
             {
                 showRadioChatModal = false;
+            }
+        }
+
+        private void EnsureFleetMessenger()
+        {
+            if (FMSFleetMessenger.Instance == null)
+            {
+                var existing = FindFirstObjectByType<FMSFleetMessenger>();
+                if (existing == null)
+                {
+                    var go = new GameObject("--- FMS_FLEET_MESSENGER ---");
+                    go.AddComponent<FMSFleetMessenger>();
+                }
             }
         }
 

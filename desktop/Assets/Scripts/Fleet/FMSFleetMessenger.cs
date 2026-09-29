@@ -229,7 +229,10 @@ namespace Virexa.FMS
 
         private IEnumerator PostDispatchMessageToBackend(ChatMessage msg)
         {
-            if (msg == null || string.IsNullOrWhiteSpace(backendBaseUrl)) yield break;
+            string baseUrl = FMSDashboardUI.Instance != null && !string.IsNullOrWhiteSpace(FMSDashboardUI.Instance.apiBaseUrl)
+                ? FMSDashboardUI.Instance.apiBaseUrl : backendBaseUrl;
+
+            if (msg == null || string.IsNullOrWhiteSpace(baseUrl)) yield break;
 
             string safeText = (msg.messageText ?? string.Empty)
                 .Replace("\\", "\\\\")
@@ -241,7 +244,7 @@ namespace Virexa.FMS
                 ? "urgent" : "normal";
             string json = $"{{\"unit_name\":\"{unit}\",\"body\":\"{safeText}\",\"priority\":\"{priority}\"}}";
 
-            using (var request = new UnityWebRequest(backendBaseUrl.TrimEnd('/') + "/api/v1/comms/messages", "POST"))
+            using (var request = new UnityWebRequest(baseUrl.TrimEnd('/') + "/api/v1/comms/messages", "POST"))
             {
                 byte[] body = Encoding.UTF8.GetBytes(json);
                 request.uploadHandler = new UploadHandlerRaw(body);
@@ -425,18 +428,21 @@ namespace Virexa.FMS
         /// </summary>
         private IEnumerator PollBackendCabinMessagesLoop()
         {
-            var waitInterval = new WaitForSeconds(1.5f);
+            var waitInterval = new WaitForSeconds(1.0f);
             while (true)
             {
                 yield return waitInterval;
 
-                if (string.IsNullOrWhiteSpace(backendBaseUrl)) continue;
+                string baseUrl = FMSDashboardUI.Instance != null && !string.IsNullOrWhiteSpace(FMSDashboardUI.Instance.apiBaseUrl)
+                    ? FMSDashboardUI.Instance.apiBaseUrl : backendBaseUrl;
 
-                string url = backendBaseUrl.TrimEnd('/') + "/api/v1/comms/messages?unit_name=ALL";
+                if (string.IsNullOrWhiteSpace(baseUrl)) continue;
+
+                string url = baseUrl.TrimEnd('/') + "/api/v1/comms/messages?unit_name=ALL";
                 using (var request = UnityWebRequest.Get(url))
                 {
                     FMSApiSession.AuthorizeDispatcher(request);
-                    request.timeout = 5;
+                    request.timeout = 4;
 
                     yield return request.SendWebRequest();
 
@@ -488,13 +494,13 @@ namespace Virexa.FMS
 
                 knownBackendMessageIds.Add(item.id);
 
-                // Only process inbound messages from cabin
-                bool isCabin = string.Equals(item.sender_role, "cabin", StringComparison.OrdinalIgnoreCase);
-                if (isCabin)
+                // Process inbound messages from cabin / mobile operator
+                bool isDispatcher = string.Equals(item.sender_role, "dispatcher", StringComparison.OrdinalIgnoreCase);
+                if (!isDispatcher)
                 {
                     string unit = string.IsNullOrWhiteSpace(item.unit_name) ? "CABIN" : item.unit_name.Trim();
                     bool isVoice = string.Equals(item.kind, "voice", StringComparison.OrdinalIgnoreCase) || 
-                                   (item.body != null && (item.body.Contains("PTT") || item.body.Contains("Suara") || item.body.Contains("Radio")));
+                                   (item.body != null && (item.body.Contains("PTT") || item.body.Contains("Suara") || item.body.Contains("Radio") || item.body.Contains("🎙️")));
                     bool isUrgent = string.Equals(item.priority, "urgent", StringComparison.OrdinalIgnoreCase) || 
                                     string.Equals(item.priority, "emergency", StringComparison.OrdinalIgnoreCase);
 
@@ -508,6 +514,11 @@ namespace Virexa.FMS
                         return;
                     }
 
+                    if (isVoice)
+                    {
+                        StartCabinTalkback(unit, $"{unit} (Operator)");
+                    }
+
                     ChatMessage chatMsg = new ChatMessage
                     {
                         messageId = item.id,
@@ -516,7 +527,7 @@ namespace Virexa.FMS
                         targetUnitId = "CONTROL_ROOM",
                         messageText = item.body,
                         priority = isUrgent ? MessagePriority.Urgent : MessagePriority.Normal,
-                        timestamp = DateTime.Now.ToString("HH:mm"),
+                        timestamp = DateTime.Now.ToString("HH:mm:ss"),
                         isRead = false,
                         isAcknowledged = false
                     };
@@ -525,16 +536,13 @@ namespace Virexa.FMS
                     unreadCabinMessagesCount++;
                     OnNewMessageReceived?.Invoke(chatMsg);
 
-                    // Chime audio based on notification filter level
-                    if (notificationFilter == NotificationFilterLevel.AllMessagesAndVoice ||
-                       (notificationFilter == NotificationFilterLevel.UrgentOnly && isUrgent))
-                    {
-                        Mobile.OperatorAudioFeedbackManager.Instance?.PlayWarningBeep();
-                    }
+                    // Chime audio
+                    Mobile.OperatorAudioFeedbackManager.Instance?.PlayWarningBeep();
 
-                    // Fire global event & show Dashboard UI popup
+                    // Fire global event
                     OnInboundCabinCommsReceived?.Invoke(unit, "OPERATOR", item.body, isVoice, isUrgent);
 
+                    // Show visual Popup in Control Room Dashboard
                     if (FMSDashboardUI.Instance != null)
                     {
                         FMSDashboardUI.Instance.ShowCabinCommunicationPopup(unit, $"{unit} (Kabin)", item.body, isVoice, isUrgent);
