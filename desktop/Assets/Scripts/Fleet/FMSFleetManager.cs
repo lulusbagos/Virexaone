@@ -162,10 +162,7 @@ namespace Virexa.FMS
             isSimulationMode = false;
             hideOfflineUnits = false;
 
-            if (spawnOnStart && isSimulationMode)
-            {
-                StartCoroutine(InitFleetCoroutine());
-            }
+
 
             if (syncWithBackend)
             {

@@ -571,7 +571,7 @@ namespace Virexa.FMS
             AnimateWheels(dt);
 
             // Anti-stacking soft separation (prevents units from clipping into each other)
-            if (!liveMode && FMSFleetManager.Instance != null && FMSFleetManager.Instance.activeFleet != null)
+            if (FMSFleetManager.Instance != null && FMSFleetManager.Instance.activeFleet != null)
             {
                 foreach (var other in FMSFleetManager.Instance.activeFleet)
                 {
