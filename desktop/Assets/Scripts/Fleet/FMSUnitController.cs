@@ -234,10 +234,13 @@ namespace Virexa.FMS
         private readonly List<LiveGpsFix> liveGpsFixes = new List<LiveGpsFix>(24);
         private DateTime serverUtcAtReceipt = DateTime.MinValue;
         private float localRealtimeAtReceipt;
-        private float playbackDelaySeconds = 12f;
-        private float desiredPlaybackDelaySeconds = 12f;
+        private float playbackDelaySeconds = 2.5f;
+        private float desiredPlaybackDelaySeconds = 2.5f;
         private DateTime playbackUtc = DateTime.MinValue;
         private bool liveGpsInitialized;
+        private float currentSmoothedGroundY = float.MinValue;
+        private float groundVelocityY = 0f;
+        private Vector3 currentSmoothedNormal = Vector3.up;
 
         private void UpdateLiveGpsTimeline(List<TrajectoryPointDto> trajectory, Vector3 latestPos,
             float liveHeadingDeg, string lastFixTime, string serverTime)
@@ -296,8 +299,8 @@ namespace Virexa.FMS
                     observedGap = Mathf.Max(observedGap, seconds);
                 }
             }
-            // Ultra-responsive GPS playback buffer (1.2s - 3.5s jitter absorption)
-            desiredPlaybackDelaySeconds = Mathf.Clamp(observedGap + 1.2f, 1.0f, 3.5f);
+            // Robust adaptive jitter buffer (2.0s - 4.0s) to guarantee zero stuttering and continuous spline flow
+            desiredPlaybackDelaySeconds = Mathf.Clamp(observedGap + 1.8f, 2.0f, 4.2f);
             if (!liveGpsInitialized) playbackDelaySeconds = desiredPlaybackDelaySeconds;
 
             float receiptRealtime = Time.realtimeSinceStartup;
@@ -346,7 +349,7 @@ namespace Virexa.FMS
         {
             if (liveGpsFixes.Count == 0 || serverUtcAtReceipt == DateTime.MinValue) return;
 
-            float delayRate = desiredPlaybackDelaySeconds > playbackDelaySeconds ? 0.8f : 0.35f;
+            float delayRate = desiredPlaybackDelaySeconds > playbackDelaySeconds ? 0.9f : 0.4f;
             playbackDelaySeconds = Mathf.MoveTowards(playbackDelaySeconds, desiredPlaybackDelaySeconds, dt * delayRate);
             DateTime serverNow = serverUtcAtReceipt.AddSeconds(Time.realtimeSinceStartup - localRealtimeAtReceipt);
             LiveGpsFix first = liveGpsFixes[0];
@@ -360,7 +363,14 @@ namespace Virexa.FMS
             else if (dt > 0f && playbackUtc < last.recordedAtUtc)
             {
                 float lagSeconds = (float)(targetPlayback - playbackUtc).TotalSeconds;
-                float playbackRate = Mathf.Clamp(1f + lagSeconds / 4f, 0.7f, 1.4f);
+                float bufferRemaining = (float)(last.recordedAtUtc - playbackUtc).TotalSeconds;
+                float speedModifier = Mathf.Clamp(lagSeconds / 3.0f, -0.35f, 0.45f);
+                float playbackRate = Mathf.Clamp(1.0f + speedModifier, 0.75f, 1.35f);
+
+                if (bufferRemaining < 0.35f && bufferRemaining > 0f)
+                {
+                    playbackRate *= Mathf.Clamp(bufferRemaining / 0.35f, 0.6f, 1.0f);
+                }
                 playbackUtc = playbackUtc.AddSeconds(dt * playbackRate);
                 if (playbackUtc > last.recordedAtUtc) playbackUtc = last.recordedAtUtc;
             }
@@ -376,18 +386,20 @@ namespace Virexa.FMS
 
             if (displayAt >= last.recordedAtUtc)
             {
-                // Dead reckoning extrapolation if still rolling
-                if (lastKnownVelocityDirection.sqrMagnitude > 0.01f && currentSpeedKmh > 1.0f && (float)(displayAt - last.recordedAtUtc).TotalSeconds < 3.0f)
+                // Continuous smooth dead-reckoning extrapolation (keeps gliding forward naturally)
+                float extraSec = (float)(displayAt - last.recordedAtUtc).TotalSeconds;
+                if (currentSpeedKmh > 0.6f && extraSec < 4.5f)
                 {
-                    float extraSec = (float)(displayAt - last.recordedAtUtc).TotalSeconds;
-                    float decayingSpeed = Mathf.Max(0f, currentSpeedKmh * (1f - extraSec / 3.0f));
-                    displayPos = last.position + lastKnownVelocityDirection.normalized * (decayingSpeed / 3.6f * extraSec);
-                    direction = lastKnownVelocityDirection;
-                    displayedSpeedKmh = decayingSpeed;
+                    float cruisingSpeed = Mathf.Max(0.5f, currentSpeedKmh * Mathf.Max(0.15f, 1f - extraSec / 4.5f));
+                    Vector3 cruiseDir = lastKnownVelocityDirection.sqrMagnitude > 0.01f ? lastKnownVelocityDirection.normalized : transform.forward;
+                    displayPos = last.position + cruiseDir * (cruisingSpeed / 3.6f * extraSec);
+                    direction = cruiseDir;
+                    displayedSpeedKmh = cruisingSpeed;
                 }
                 else
                 {
                     displayPos = last.position;
+                    displayedSpeedKmh = 0f;
                 }
             }
             else if (displayAt > first.recordedAtUtc)
@@ -443,7 +455,6 @@ namespace Virexa.FMS
             {
                 float smoothSpeed = Mathf.Max(6f, displayedSpeedKmh * 0.35f);
                 transform.position = Vector3.Lerp(transform.position, displayPos, Mathf.Clamp01(dt * smoothSpeed));
-                AlignToGround(instant: false);
             }
             else
             {
@@ -1435,13 +1446,13 @@ namespace Virexa.FMS
         public void AlignToGround(bool instant = false)
         {
             Terrain activeTerrain = Terrain.activeTerrain ?? FindFirstObjectByType<Terrain>();
-            float groundY = transform.position.y;
-            Vector3 terrainNormal = Vector3.up;
+            float targetY = transform.position.y;
+            Vector3 targetNormal = Vector3.up;
 
             if (activeTerrain != null)
             {
-                groundY = activeTerrain.SampleHeight(transform.position) + activeTerrain.transform.position.y;
-                terrainNormal = activeTerrain.terrainData.GetInterpolatedNormal(
+                targetY = activeTerrain.SampleHeight(transform.position) + activeTerrain.transform.position.y;
+                targetNormal = activeTerrain.terrainData.GetInterpolatedNormal(
                     (transform.position.x - activeTerrain.transform.position.x) / activeTerrain.terrainData.size.x,
                     (transform.position.z - activeTerrain.transform.position.z) / activeTerrain.terrainData.size.z
                 );
@@ -1449,7 +1460,7 @@ namespace Virexa.FMS
             else
             {
                 // Multi-hit raycast ignoring self and unit colliders to eliminate vertical ground flickering
-                RaycastHit[] hits = Physics.RaycastAll(transform.position + Vector3.up * 40f, Vector3.down, 120f);
+                RaycastHit[] hits = Physics.RaycastAll(transform.position + Vector3.up * 15f, Vector3.down, 50f);
                 float bestY = -9999f;
                 Vector3 bestNormal = Vector3.up;
                 bool foundGround = false;
@@ -1469,32 +1480,36 @@ namespace Virexa.FMS
 
                 if (foundGround)
                 {
-                    groundY = bestY;
-                    terrainNormal = bestNormal;
+                    targetY = bestY;
+                    targetNormal = bestNormal;
                 }
             }
 
-            Vector3 targetPos = new Vector3(transform.position.x, groundY + 0.1f + suspensionBounceY, transform.position.z);
-            if (instant)
+            if (instant || currentSmoothedGroundY < -9000f)
             {
-                transform.position = targetPos;
+                currentSmoothedGroundY = targetY;
+                currentSmoothedNormal = targetNormal;
+                transform.position = new Vector3(transform.position.x, targetY + 0.1f + suspensionBounceY, transform.position.z);
             }
             else
             {
-                transform.position = Vector3.Lerp(transform.position, targetPos, Time.deltaTime * 18f);
+                // Exponential low-pass damping filter: 100% eliminates up-down jittering/bouncing
+                currentSmoothedGroundY = Mathf.SmoothDamp(currentSmoothedGroundY, targetY, ref groundVelocityY, 0.10f);
+                currentSmoothedNormal = Vector3.Slerp(currentSmoothedNormal, targetNormal, Time.deltaTime * 6f);
+                transform.position = new Vector3(transform.position.x, currentSmoothedGroundY + 0.1f + suspensionBounceY, transform.position.z);
             }
 
-            // Slope Pitch & Roll alignment with subtle turning chassis roll
-            if (terrainNormal.sqrMagnitude > 0.01f)
+            // Slope Pitch & Roll alignment with subtle chassis steering bank
+            if (currentSmoothedNormal.sqrMagnitude > 0.01f)
             {
-                Quaternion slopeRot = Quaternion.FromToRotation(transform.up, terrainNormal) * transform.rotation;
+                Quaternion slopeRot = Quaternion.FromToRotation(transform.up, currentSmoothedNormal) * transform.rotation;
                 if (!instant && Mathf.Abs(currentSteeringAngleDelta) > 0.05f)
                 {
-                    float rollBank = Mathf.Clamp(-currentSteeringAngleDelta * 0.04f, -2.5f, 2.5f);
+                    float rollBank = Mathf.Clamp(-currentSteeringAngleDelta * 0.04f, -2.0f, 2.0f);
                     slopeRot *= Quaternion.Euler(0f, 0f, rollBank);
                 }
                 if (instant) transform.rotation = slopeRot;
-                else transform.rotation = Quaternion.Slerp(transform.rotation, slopeRot, Time.deltaTime * 6f);
+                else transform.rotation = Quaternion.Slerp(transform.rotation, slopeRot, Time.deltaTime * 5f);
             }
         }
 
