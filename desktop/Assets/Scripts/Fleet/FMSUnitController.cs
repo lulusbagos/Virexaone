@@ -564,35 +564,8 @@ namespace Virexa.FMS
             secondsSinceLastBackendUpdate += dt;
             suspensionBounceY = Mathf.MoveTowards(suspensionBounceY, 0f, dt * 0.8f);
 
-            bool liveMode = FMSFleetManager.Instance != null && !FMSFleetManager.Instance.isSimulationMode;
-            if (liveMode)
-            {
-                RenderLiveGpsPosition(dt);
-                if (unitType == UnitType.Excavator) AnimateLiveExcavatorLoading(dt);
-            }
-            else
-            {
-                switch (unitType)
-                {
-                    case UnitType.HaulTruck:
-                    case UnitType.FuelTruck:
-                    case UnitType.Grader:
-                        UpdateHaulerMovement(dt);
-                        break;
-                    case UnitType.Excavator:
-                        UpdateExcavatorBehavior(dt);
-                        break;
-                    case UnitType.Bulldozer:
-                        UpdateBulldozerBehavior(dt);
-                        break;
-                    case UnitType.WheelLoader:
-                        UpdateWheelLoaderBehavior(dt);
-                        break;
-                    default:
-                        UpdateHaulerMovement(dt);
-                        break;
-                }
-            }
+            RenderLiveGpsPosition(dt);
+            if (unitType == UnitType.Excavator) AnimateLiveExcavatorLoading(dt);
 
             // 2. Animate Wheel Rotation
             AnimateWheels(dt);
@@ -1678,3 +1651,4 @@ namespace Virexa.FMS
         }
     }
 }
+
