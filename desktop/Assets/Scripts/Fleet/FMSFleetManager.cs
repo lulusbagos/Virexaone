@@ -155,12 +155,14 @@ namespace Virexa.FMS
             // Strictly enforce Live GPS Mode (No autonomous simulated motion when API is down)
             isSimulationMode = false;
             hideOfflineUnits = false;
+            Application.runInBackground = true;
         }
 
         private void Start()
         {
             isSimulationMode = false;
             hideOfflineUnits = false;
+            Application.runInBackground = true;
 
 
 

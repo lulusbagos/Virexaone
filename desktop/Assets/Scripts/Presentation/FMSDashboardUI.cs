@@ -365,7 +365,7 @@ namespace Virexa.FMS
 
         private void Awake()
         {
-            if (Instance == null) Instance = this;
+            if (Instance == null) { Instance = this; Application.runInBackground = true; }
             else Destroy(gameObject);
         }
 
