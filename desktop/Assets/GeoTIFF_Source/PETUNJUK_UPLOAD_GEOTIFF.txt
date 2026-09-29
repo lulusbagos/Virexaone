@@ -1,0 +1,22 @@
+========================================================================
+VIREXAONE - FOLDER SUMBER DATA GEOTIFF & ORTHOPHOTO PIT TAMBANG
+========================================================================
+
+Folder ini disiapkan sebagai lokasi penyimpanan dan pembaruan citra GeoTIFF / Orthophoto resolusi tinggi untuk Pit Tambang.
+
+Format yang didukung:
+- .TIF / .TIFF (GeoTIFF Orthophoto)
+- .PNG (RGB 8-bit / 16-bit)
+- .JPG / .JPEG (High Resolution Texture)
+
+Cara Update GeoTIFF:
+1. Dari Aplikasi Virexaone:
+   - Buka menu: File -> 📂 Upload GeoTIFF Baru...
+   - Pilih file citra/GeoTIFF dari komputer Anda. Peta 3D akan otomatis terupdate secara instan!
+2. Atau letakkan file GeoTIFF/PNG baru ke dalam folder ini (Assets/GeoTIFF_Source/).
+
+Dimensi Acuan Default:
+- Easting / Panjang X : 5,451.6 meter (Zona 50N: 570002.5 - 575454.1)
+- Northing / Lebar Z   : 4,087.0 meter (Zona 50N: 111294.8 - 115381.8)
+- Elevasi (RL Datum)  : 71.02 m - 316.46 m
+========================================================================

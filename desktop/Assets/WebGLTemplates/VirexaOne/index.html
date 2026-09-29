@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101b1e">
+  <title>Virexa One</title>
+  <link rel="icon" type="image/png" href="brand-icon.png">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; }
+    body { overflow: hidden; background: #101b1e; color: #f3f7f6; font-family: Arial, Helvetica, sans-serif; }
+    #shell, #canvas { width: 100%; height: 100%; }
+    #canvas { display: block; outline: none; }
+    #loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #101b1e; }
+    #loading[hidden], #error[hidden] { display: none; }
+    #mark { width: 124px; height: 124px; object-fit: contain; }
+    #name { margin: 0; font-size: 27px; font-weight: 700; }
+    #name span { color: #53c9ae; }
+    #company { margin: -8px 0 22px; color: #a9b9b6; font-size: 12px; }
+    #track { width: min(380px, calc(100vw - 56px)); height: 4px; background: #314342; }
+    #fill { width: 0; height: 100%; background: #53c9ae; transition: width .18s linear; }
+    #status { min-height: 20px; margin: 0; color: #a9b9b6; font-size: 12px; }
+    #error { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 24px; background: #101b1e; text-align: center; }
+    #error p { max-width: 360px; margin: 0; color: #a9b9b6; line-height: 1.5; }
+    #retry { min-width: 140px; min-height: 42px; border: 0; border-radius: 4px; background: #53c9ae; color: #101b1e; font: 700 14px Arial, sans-serif; cursor: pointer; }
+    #retry:focus-visible { outline: 2px solid #f3f7f6; outline-offset: 3px; }
+  </style>
+</head>
+<body>
+  <main id="shell">
+    <canvas id="canvas" tabindex="-1"></canvas>
+    <section id="loading" aria-live="polite">
+      <img id="mark" src="brand-icon.png" alt="">
+      <h1 id="name">VIREXA <span>ONE</span></h1>
+      <p id="company">PUSAT KENDALI OPERASI</p>
+      <div id="track" role="progressbar" aria-label="Memuat aplikasi" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="fill"></div></div>
+      <p id="status">Menyiapkan pusat kendali...</p>
+    </section>
+    <section id="error" hidden>
+      <h1>Gagal membuka aplikasi</h1>
+      <p>Periksa koneksi Anda, lalu coba lagi.</p>
+      <button id="retry" type="button">Coba lagi</button>
+    </section>
+  </main>
+  <script>
+    const canvas = document.getElementById("canvas");
+    const loading = document.getElementById("loading");
+    const error = document.getElementById("error");
+    const progress = document.getElementById("track");
+    const fill = document.getElementById("fill");
+    document.getElementById("retry").addEventListener("click", () => location.reload());
+
+    const config = {
+      dataUrl: "Build/{{{ DATA_FILENAME }}}",
+      frameworkUrl: "Build/{{{ FRAMEWORK_FILENAME }}}",
+      codeUrl: "Build/{{{ CODE_FILENAME }}}",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "{{{ COMPANY_NAME }}}",
+      productName: "{{{ PRODUCT_NAME }}}",
+      productVersion: "{{{ PRODUCT_VERSION }}}"
+    };
+    const loader = document.createElement("script");
+    loader.src = "Build/{{{ LOADER_FILENAME }}}";
+    loader.onload = () => {
+      createUnityInstance(canvas, config, value => {
+        const percentage = Math.round(value * 100);
+        fill.style.width = percentage + "%";
+        progress.setAttribute("aria-valuenow", String(percentage));
+        document.getElementById("status").textContent = "Menyiapkan pusat kendali... " + percentage + "%";
+      }).then(() => { loading.hidden = true; canvas.focus(); })
+        .catch(reason => { console.error(reason); loading.hidden = true; error.hidden = false; });
+    };
+    loader.onerror = () => { loading.hidden = true; error.hidden = false; };
+    document.body.appendChild(loader);
+  </script>
+</body>
+</html>

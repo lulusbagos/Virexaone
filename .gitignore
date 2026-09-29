@@ -1,0 +1,74 @@
+# ==========================================
+# Virexaone Monorepo Git Ignore Rules
+# ==========================================
+
+# ------------------------------------------
+# .NET / ASP.NET Core Backend
+# ------------------------------------------
+**/bin/
+**/obj/
+**/appsettings.Local.json
+**/appsettings.*.local.json
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.log
+
+# ------------------------------------------
+# Flutter / Dart Mobile
+# ------------------------------------------
+Mobile/.dart_tool/
+Mobile/build/
+Mobile/.flutter-plugins
+Mobile/.flutter-plugins-dependencies
+Mobile/.packages
+Mobile/android/.gradle/
+Mobile/android/local.properties
+Mobile/ios/.symlinks/
+Mobile/ios/Pods/
+Mobile/ios/Podfile.lock
+Mobile/windows/flutter/ephemeral/
+
+# ------------------------------------------
+# Unity Desktop (Digital Twin 3D)
+# ------------------------------------------
+desktop/[Ll]ibrary/
+desktop/[Tt]emp/
+desktop/[Oo]bj/
+desktop/[Bb]uild/
+desktop/[Bb]uilds/
+desktop/[Ll]ogs/
+desktop/[Uu]ser[Ss]ettings/
+desktop/MemoryCaptures/
+desktop/Recordings/
+
+# Unity generated visual studio files
+desktop/*.csproj
+desktop/*.unityproj
+desktop/*.sln
+desktop/*.suo
+desktop/*.tmp
+desktop/*.user
+desktop/*.userprefs
+desktop/*.pidb
+desktop/*.booproj
+desktop/*.svd
+desktop/*.pdb
+desktop/*.opendb
+desktop/*.VC.db
+
+# Unity Crash Reports
+desktop/sysinfo.txt
+desktop/crash*
+
+# ------------------------------------------
+# OS & IDE Common
+# ------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.bak

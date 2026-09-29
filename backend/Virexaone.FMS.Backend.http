@@ -1,0 +1,29 @@
+@BaseUrl = http://127.0.0.1:8000
+
+GET {{BaseUrl}}/health
+Accept: application/json
+
+###
+
+GET {{BaseUrl}}/api/v1/fms/catalog
+Accept: application/json
+
+###
+
+GET {{BaseUrl}}/api/v1/fms/roads/audit?scope=priority&offset=0&limit=50
+Accept: application/json
+
+###
+
+GET {{BaseUrl}}/api/v1/locations/actual
+Accept: application/json
+
+###
+
+GET {{BaseUrl}}/api/v1/fms/map-drafts
+Accept: application/json
+
+###
+
+GET {{BaseUrl}}/api/v1/fms/map-drafts/00000000-0000-0000-0000-000000000001
+Accept: application/json

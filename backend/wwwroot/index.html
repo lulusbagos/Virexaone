@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Virexa FMS // Audit Pergerakan & Live Telemetry</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #090D16;
+      --bg-card: #0F172A;
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-hover-border: rgba(56, 189, 248, 0.35);
+      
+      --accent-cyan: #00E5FF;
+      --accent-blue: #38BDF8;
+      --accent-purple: #818CF8;
+      --accent-emerald: #10B981;
+      --accent-rose: #EF4444;
+      --accent-amber: #F59E0B;
+      
+      --text-main: #F8FAFC;
+      --text-muted: #94A3B8;
+      --text-dark: #64748B;
+      --table-row-hover: rgba(30, 41, 59, 0.5);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: radial-gradient(circle at 50% 0%, #111C35 0%, var(--bg-dark) 75%);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 24px 28px;
+    }
+
+    .container {
+      max-width: 1560px;
+      margin: 0 auto;
+    }
+
+    /* TOP METRIC CARDS ROW */
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: #0E1626;
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      position: relative;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .card:hover {
+      border-color: var(--card-hover-border);
+      transform: translateY(-2px);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .card-icon {
+      font-size: 18px;
+      opacity: 0.85;
+    }
+
+    .card-value {
+      font-size: 26px;
+      font-weight: 800;
+      color: #FFF;
+      margin-bottom: 4px;
+      font-feature-settings: "tnum";
+      font-variant-numeric: tabular-nums;
+    }
+
+    .card-sub {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-dark);
+    }
+
+    /* Card Specific Colors */
+    .card-purple .card-icon { color: var(--accent-purple); }
+    .card-cyan .card-icon { color: var(--accent-cyan); }
+    
+    .card-moving {
+      border-color: rgba(16, 185, 129, 0.25);
+      background: linear-gradient(180deg, rgba(16, 185, 129, 0.05) 0%, #0E1626 100%);
+    }
+    .card-moving .card-title { color: #34D399; }
+    .card-moving .card-value { color: #10B981; }
+    .card-moving .card-sub { color: #059669; font-weight: 600; }
+    .card-moving .card-icon { color: #10B981; }
+
+    .card-static {
+      border-color: rgba(239, 68, 68, 0.2);
+      background: linear-gradient(180deg, rgba(239, 68, 68, 0.04) 0%, #0E1626 100%);
+    }
+    .card-static .card-title { color: #F87171; }
+    .card-static .card-value { color: #EF4444; }
+    .card-static .card-sub { color: #DC2626; font-weight: 600; }
+    .card-static .card-icon { color: #EF4444; }
+
+    .card-offline {
+      border-color: rgba(245, 158, 11, 0.2);
+      background: linear-gradient(180deg, rgba(245, 158, 11, 0.04) 0%, #0E1626 100%);
+    }
+    .card-offline .card-title { color: #FBBF24; }
+    .card-offline .card-value { color: #F59E0B; }
+    .card-offline .card-sub { color: #D97706; font-weight: 600; }
+    .card-offline .card-icon { color: #F59E0B; }
+
+    /* MAIN TABLE SECTION */
+    .table-panel {
+      background: #0D1525;
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 22px 24px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .table-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .table-title-group h2 {
+      font-size: 17px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #FFF;
+      margin-bottom: 4px;
+    }
+
+    .table-title-group p {
+      font-size: 13px;
+      color: var(--text-dark);
+    }
+
+    .controls-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .search-input {
+      background: #090E1A;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      color: #FFF;
+      outline: none;
+      width: 220px;
+      transition: all 0.2s ease;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+
+    .filter-tabs {
+      display: flex;
+      background: #090E1A;
+      border-radius: 8px;
+      padding: 3px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .filter-tab {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .filter-tab.active {
+      background: #1E293B;
+      color: #FFF;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    }
+
+    .btn-refresh {
+      background: #1E293B;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text-main);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-refresh:hover {
+      background: #334155;
+    }
+
+    /* TABLE */
+    .table-container {
+      overflow-x: auto;
+      border-radius: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    thead th {
+      background: #0B111F;
+      color: #718096;
+      font-weight: 700;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      white-space: nowrap;
+    }
+
+    tbody tr {
+      background: #0E1626;
+      transition: background 0.15s ease;
+    }
+
+    tbody tr:nth-child(even) {
+      background: #0B1220;
+    }
+
+    tbody tr:hover {
+      background: #172238;
+    }
+
+    tbody td {
+      padding: 13px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      vertical-align: middle;
+      color: #CBD5E1;
+    }
+
+    .cell-id {
+      color: #64748B;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+
+    .cell-name {
+      color: #FFF;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .tag-status {
+      display: inline-block;
+      background: #162033;
+      color: #94A3B8;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 500;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .cell-source {
+      color: #94A3B8;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+
+    .cell-logs {
+      color: #60A5FA;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .cell-range {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: #94A3B8;
+    }
+
+    .cell-delta-lat {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 12px;
+      color: #10B981;
+    }
+
+    .cell-delta-lon {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 12px;
+      color: #38BDF8;
+    }
+
+    .cell-delta-zero {
+      color: #64748B !important;
+      font-weight: 400 !important;
+    }
+
+    .badge-moving {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(16, 185, 129, 0.14);
+      color: #34D399;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .badge-static {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(239, 68, 68, 0.12);
+      color: #F87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .badge-offline {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(245, 158, 11, 0.12);
+      color: #FBBF24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .btn-detail {
+      background: #162238;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #93C5FD;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+    }
+
+    .btn-detail:hover {
+      background: #2563EB;
+      color: #FFF;
+      border-color: #2563EB;
+    }
+
+    /* MODAL POPUP */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.2s ease;
+    }
+
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-dialog {
+      background: #0F172A;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      width: 90%;
+      max-width: 800px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      transform: scale(0.95);
+      transition: all 0.2s ease;
+    }
+
+    .modal-overlay.open .modal-dialog {
+      transform: scale(1);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .modal-header h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #FFF;
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-dark);
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    .modal-close:hover {
+      color: #FFF;
+    }
+
+    .modal-body {
+      padding: 20px 24px;
+      overflow-y: auto;
+    }
+
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .history-table th {
+      background: #0B111F;
+      padding: 10px;
+      text-align: left;
+      color: #94A3B8;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .history-table td {
+      padding: 9px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: #CBD5E1;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- 5 KPI METRICS -->
+    <div class="metric-grid">
+      
+      <!-- 1. Total History Logs -->
+      <div class="card card-purple">
+        <div class="card-header">
+          <span class="card-title">TOTAL HISTORY LOGS</span>
+          <span class="card-icon">🗄️</span>
+        </div>
+        <div class="card-value" id="val-total-logs">0</div>
+        <div class="card-sub">Riwayat GPS traveling</div>
+      </div>
+
+      <!-- 2. Equipment Audited -->
+      <div class="card card-cyan">
+        <div class="card-header">
+          <span class="card-title">EQUIPMENT AUDITED</span>
+          <span class="card-icon">🚜</span>
+        </div>
+        <div class="card-value" id="val-total-audited">0</div>
+        <div class="card-sub">Total unit di-sample</div>
+      </div>
+
+      <!-- 3. Unit Bergerak -->
+      <div class="card card-moving">
+        <div class="card-header">
+          <span class="card-title">UNIT BERGERAK</span>
+          <span class="card-icon">✔</span>
+        </div>
+        <div class="card-value" id="val-moving-ratio">0 / 0</div>
+        <div class="card-sub" id="val-moving-pct">0% Moving</div>
+      </div>
+
+      <!-- 4. Unit Statis -->
+      <div class="card card-static">
+        <div class="card-header">
+          <span class="card-title">UNIT STATIS</span>
+          <span class="card-icon">⊘</span>
+        </div>
+        <div class="card-value" id="val-static-ratio">0 / 0</div>
+        <div class="card-sub" id="val-static-pct">0% Static</div>
+      </div>
+
+      <!-- 5. Unit Offline -->
+      <div class="card card-offline">
+        <div class="card-header">
+          <span class="card-title">UNIT OFFLINE / NO SIGNAL</span>
+          <span class="card-icon">⚠</span>
+        </div>
+        <div class="card-value" id="val-offline-ratio">0 / 0</div>
+        <div class="card-sub" id="val-offline-pct">0% Offline / No Signal</div>
+      </div>
+
+    </div>
+
+    <!-- MAIN DATA TABLE -->
+    <div class="table-panel">
+      
+      <div class="table-header-row">
+        <div class="table-title-group">
+          <h2>📊 Tabel Bukti Pergerakan & Status Unit Equipment</h2>
+          <p>Status dari dua fix GPS terbaru; rentang koordinat dari sampel terbaru.</p>
+        </div>
+
+        <div class="controls-group">
+          <input type="text" id="search-input" class="search-input" placeholder="🔍 Cari Unit (misal: RD4014)..." oninput="applyFilters()">
+          
+          <div class="filter-tabs">
+            <button class="filter-tab active" onclick="setFilter('ALL', this)">Semua (<span id="count-all">0</span>)</button>
+            <button class="filter-tab" onclick="setFilter('BERGERAK', this)">Bergerak (<span id="count-moving">0</span>)</button>
+            <button class="filter-tab" onclick="setFilter('STATIS', this)">Statis (<span id="count-static">0</span>)</button>
+            <button class="filter-tab" onclick="setFilter('OFFLINE', this)">Offline (<span id="count-offline">0</span>)</button>
+          </div>
+
+          <button class="btn-refresh" onclick="fetchMovementData()">
+            <span>🔄</span> Refresh
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>EQUIP ID</th>
+              <th>NAMA UNIT</th>
+              <th>TIPE / STATUS ALAT</th>
+              <th>TABEL SUMBER</th>
+              <th>SAMPEL GPS TERBARU</th>
+              <th>RANGE LATITUDE (MIN → MAX)</th>
+              <th>Δ LATITUDE</th>
+              <th>Δ LONGITUDE</th>
+              <th>STATUS PERGERAKAN</th>
+              <th>AKSI</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <tr>
+              <td colspan="10" style="text-align: center; padding: 40px; color: #64748B;">
+                Memuat data pergerakan unit...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- DETAIL MODAL -->
+  <div class="modal-overlay" id="detail-modal" onclick="closeModal(event)">
+    <div class="modal-dialog" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="modal-title">Riwayat Log Pergerakan GPS</h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body">
+        Memuat riwayat koordinat...
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allData = [];
+    let currentFilter = 'ALL';
+
+    async function fetchMovementData() {
+      try {
+        const res = await fetch('/api/v1/audit/movement');
+        const json = await res.json();
+        
+        if (!json.success) return;
+
+        const summary = json.summary;
+        allData = json.data || [];
+
+        // Update KPI Cards
+        document.getElementById('val-total-logs').textContent = (summary.total_history_logs || 0).toLocaleString();
+        document.getElementById('val-total-audited').textContent = summary.equipment_audited || 0;
+        
+        document.getElementById('val-moving-ratio').textContent = `${summary.unit_moving} / ${summary.equipment_audited}`;
+        document.getElementById('val-moving-pct').textContent = `${summary.moving_percent}% Moving`;
+
+        document.getElementById('val-static-ratio').textContent = `${summary.unit_static} / ${summary.equipment_audited}`;
+        document.getElementById('val-static-pct').textContent = `${summary.static_percent}% Static`;
+
+        document.getElementById('val-offline-ratio').textContent = `${summary.unit_offline} / ${summary.equipment_audited}`;
+        document.getElementById('val-offline-pct').textContent = `${summary.offline_percent}% Offline / No Signal`;
+
+        // Update Tab Counts
+        document.getElementById('count-all').textContent = summary.equipment_audited;
+        document.getElementById('count-moving').textContent = summary.unit_moving;
+        document.getElementById('count-static').textContent = summary.unit_static;
+        document.getElementById('count-offline').textContent = summary.unit_offline;
+
+        applyFilters();
+      } catch (err) {
+        console.error('Fetch error:', err);
+      }
+    }
+
+    function setFilter(filter, el) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+      if (el) el.classList.add('active');
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const search = document.getElementById('search-input').value.trim().toLowerCase();
+      const filtered = allData.filter(u => {
+        const matchesFilter = (currentFilter === 'ALL') || (u.status_pergerakan === currentFilter);
+        const matchesSearch = !search || u.unit_name.toLowerCase().includes(search) || String(u.equipment_id).includes(search);
+        return matchesFilter && matchesSearch;
+      });
+
+      renderTable(filtered);
+    }
+
+    function renderTable(list) {
+      const tbody = document.getElementById('table-body');
+      if (!list || list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 30px; color: #64748B;">Tidak ada unit yang cocok dengan filter.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(u => {
+        let badgeClass = 'badge-moving';
+        let badgeText = '● BERGERAK';
+
+        if (u.status_pergerakan === 'STATIS') {
+          badgeClass = 'badge-static';
+          badgeText = '● STATIS';
+        } else if (u.status_pergerakan === 'OFFLINE') {
+          badgeClass = 'badge-offline';
+          badgeText = '● OFFLINE';
+        }
+
+        const deltaLatClass = u.delta_lat > 0 ? 'cell-delta-lat' : 'cell-delta-zero';
+        const deltaLonClass = u.delta_lon > 0 ? 'cell-delta-lon' : 'cell-delta-zero';
+
+        const minLatStr = u.min_lat ? u.min_lat.toFixed(4) : '0.0000';
+        const maxLatStr = u.max_lat ? u.max_lat.toFixed(4) : '0.0000';
+
+        return `
+          <tr>
+            <td class="cell-id">#${u.equipment_id}</td>
+            <td class="cell-name">${u.unit_name}</td>
+            <td><span class="tag-status">${u.status_label}</span></td>
+            <td class="cell-source">${u.table_source}</td>
+            <td class="cell-logs">${u.snapshot_logs}</td>
+            <td class="cell-range">${minLatStr} → ${maxLatStr}</td>
+            <td class="${deltaLatClass}">${u.delta_lat.toFixed(6)}</td>
+            <td class="${deltaLonClass}">${u.delta_lon.toFixed(6)}</td>
+            <td><span class="${badgeClass}">${badgeText}</span></td>
+            <td>
+              <button class="btn-detail" onclick="showDetail(${u.equipment_id}, '${u.unit_name}')">
+                <span>📋</span> Detail
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function showDetail(eqId, unitName) {
+      document.getElementById('modal-title').textContent = `Riwayat Log GPS // Unit ${unitName} (Equip #${eqId})`;
+      document.getElementById('modal-body').innerHTML = `Memuat log riwayat GPS...`;
+      document.getElementById('detail-modal').classList.add('open');
+
+      try {
+        const res = await fetch(`/api/v1/audit/unit/${eqId}/history`);
+        const json = await res.json();
+        
+        if (!json.success || !json.history || json.history.length === 0) {
+          document.getElementById('modal-body').innerHTML = `<p style="color: #94A3B8; padding: 20px;">Belum ada riwayat GPS untuk unit ini.</p>`;
+          return;
+        }
+
+        let html = `
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>LATITUDE</th>
+                <th>LONGITUDE</th>
+                <th>SPEED (KM/H)</th>
+                <th>HEADING</th>
+                <th>UPDATED AT</th>
+                <th>INGESTED AT</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        json.history.forEach((h, i) => {
+          const speed = h.velocity != null ? Number(h.velocity).toFixed(1) : '0.0';
+          const heading = h.heading != null ? Number(h.heading).toFixed(0) + '°' : '0°';
+          const upAt = h.updated_at ? new Date(h.updated_at).toLocaleTimeString('id-ID') : '-';
+          const inAt = h.ingested_at ? new Date(h.ingested_at).toLocaleTimeString('id-ID') : '-';
+
+          html += `
+            <tr>
+              <td>${i + 1}</td>
+              <td style="color: #10B981;">${h.latitude}</td>
+              <td style="color: #38BDF8;">${h.longitude}</td>
+              <td>${speed}</td>
+              <td>${heading}</td>
+              <td>${upAt}</td>
+              <td>${inAt}</td>
+            </tr>
+          `;
+        });
+
+        html += `</tbody></table>`;
+        document.getElementById('modal-body').innerHTML = html;
+      } catch (err) {
+        document.getElementById('modal-body').innerHTML = `<p style="color: #EF4444;">Gagal memuat detail history: ${err.message}</p>`;
+      }
+    }
+
+    function closeModal(e) {
+      if (!e || e.target.classList.contains('modal-overlay') || e.target.classList.contains('modal-close')) {
+        document.getElementById('detail-modal').classList.remove('open');
+      }
+    }
+
+    // Initial fetch & Auto-refresh every 15s
+    fetchMovementData();
+    setInterval(fetchMovementData, 15000);
+  </script>
+
+</body>
+</html>

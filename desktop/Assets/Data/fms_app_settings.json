@@ -1,0 +1,133 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2026-09-17T22:15:00Z",
+  "app_settings": {
+    "project_name": "Virexaone FMS 3D Digital Twin",
+    "site_name": "Pit Unggul Mining Site",
+    "utm_epsg": 32650,
+    "ref_easting": 572728.3,
+    "ref_northing": 113338.3,
+    "ref_elevation": 71.0,
+    "geotiff_active_file": "Assets/Textures/geotiff_ortho_4k.jpg",
+    "road_line_width_m": 3.6,
+    "road_line_elevation_offset_m": 0.6,
+    "camera_default_distance": 2800.0,
+    "camera_default_pitch": 45.0,
+    "camera_default_yaw": -45.0,
+    "backend_api_url": "http://127.0.0.1:8000"
+  },
+  "unit_assets_table": [
+    {
+      "category": "HaulerEmpty",
+      "display_name": "Dump Truck (Kosong / Traveling)",
+      "icon": "🚚",
+      "model_file_name": "truck_empty_draco.glb",
+      "relative_path": "Assets/Models/UnitModels/truck_empty_draco.glb",
+      "file_format": "GLB 2.0 Draco PBR",
+      "scale_multiplier": 1.0,
+      "actual_dimensions_m": {
+        "length": 10.8,
+        "width": 5.8,
+        "height": 5.3
+      },
+      "reference_machine": "CAT 777D/E / Komatsu HD785 (100-Ton Hauler)",
+      "is_active": true
+    },
+    {
+      "category": "HaulerLoaded",
+      "display_name": "Dump Truck (Bermuatan / Hauling)",
+      "icon": "🚚",
+      "model_file_name": "truck_loaded_draco.glb",
+      "relative_path": "Assets/Models/UnitModels/truck_loaded_draco.glb",
+      "file_format": "GLB 2.0 Draco PBR",
+      "scale_multiplier": 1.0,
+      "actual_dimensions_m": {
+        "length": 10.8,
+        "width": 5.8,
+        "height": 5.3
+      },
+      "reference_machine": "CAT 777D/E / Komatsu HD785 (Loaded OB/Coal)",
+      "is_active": true
+    },
+    {
+      "category": "Excavator",
+      "display_name": "Excavator Shovel (Front Loading)",
+      "icon": "⛏️",
+      "model_file_name": "excavator_draco.glb",
+      "relative_path": "Assets/Models/UnitModels/excavator_draco.glb",
+      "file_format": "GLB 2.0 Draco PBR",
+      "scale_multiplier": 1.0,
+      "actual_dimensions_m": {
+        "length": 14.5,
+        "width": 6.8,
+        "height": 6.2
+      },
+      "reference_machine": "Komatsu PC2000-8 / CAT 6020B (Mining Shovel)",
+      "is_active": true
+    },
+    {
+      "category": "Bulldozer",
+      "display_name": "Bulldozer (Disposal / Bench)",
+      "icon": "🚜",
+      "model_file_name": "dozer_draco.glb",
+      "relative_path": "Assets/Models/UnitModels/dozer_draco.glb",
+      "file_format": "GLB 2.0 Draco PBR",
+      "scale_multiplier": 1.0,
+      "actual_dimensions_m": {
+        "length": 8.8,
+        "width": 4.8,
+        "height": 4.3
+      },
+      "reference_machine": "Komatsu D375A / CAT D9T (Track-type Tractor)",
+      "is_active": true
+    },
+    {
+      "category": "Grader",
+      "display_name": "Motor Grader (Perawatan Jalan)",
+      "icon": "🛣️",
+      "model_file_name": "grader_draco.glb",
+      "relative_path": "Assets/Models/UnitModels/grader_draco.glb",
+      "file_format": "GLB 2.0 Draco PBR",
+      "scale_multiplier": 1.0,
+      "actual_dimensions_m": {
+        "length": 11.5,
+        "width": 3.4,
+        "height": 3.7
+      },
+      "reference_machine": "CAT 16M / Komatsu GD825A (Haul Road Maintenance)",
+      "is_active": true
+    },
+    {
+      "category": "FuelTruck",
+      "display_name": "Fuel & Service Truck (Support)",
+      "icon": "🛢️",
+      "model_file_name": "fueltruck_draco.glb",
+      "relative_path": "Assets/Models/UnitModels/fueltruck_draco.glb",
+      "file_format": "GLB 2.0 Draco PBR",
+      "scale_multiplier": 1.0,
+      "actual_dimensions_m": {
+        "length": 9.2,
+        "width": 3.2,
+        "height": 3.5
+      },
+      "reference_machine": "Hino 500 / Scania P380 (Fuel Tanker & Service Rig)",
+      "is_active": true
+    },
+    {
+      "category": "WheelLoader",
+      "display_name": "Wheel Loader (Stockpile)",
+      "icon": "🚜",
+      "model_file_name": "loader_draco.glb",
+      "relative_path": "Assets/Models/UnitModels/loader_draco.glb",
+      "file_format": "GLB 2.0 Draco PBR",
+      "scale_multiplier": 1.0,
+      "actual_dimensions_m": {
+        "length": 12.5,
+        "width": 4.4,
+        "height": 5.0
+      },
+      "reference_machine": "CAT 992K / Komatsu WA600 (Wheel Loader)",
+      "is_active": true
+    }
+  ]
+}

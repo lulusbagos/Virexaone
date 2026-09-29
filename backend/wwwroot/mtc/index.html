@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MTC | Virexa One</title>
+  <style>
+    :root { color-scheme: light; font-family: "Segoe UI", Arial, sans-serif; font-size: 14px; letter-spacing: 0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #e9efed; color: #172522; }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 62px; padding: 10px 24px; background: #102528; color: #f3f8f5; border-bottom: 2px solid #42b39b; }
+    .brand { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+    .brand strong { font-size: 16px; white-space: nowrap; }
+    .brand span { color: #a8c7bb; font-size: 12px; }
+    .header-actions { display: flex; align-items: center; gap: 10px; }
+    .header-actions button { border: 1px solid #76978b; color: #fff; background: transparent; padding: 7px 10px; border-radius: 4px; }
+    .header-actions button:hover { background: #2d5144; }
+    .shell { max-width: 1600px; margin: auto; padding: 22px 24px 40px; }
+    .topline { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    h1 { font-size: 23px; margin: 0 0 4px; }
+    .sub { color: #61716c; margin: 0; font-size: 12px; }
+    .state { font-weight: 700; font-size: 12px; white-space: nowrap; color: #226d5b; padding: 7px 10px; border: 1px solid #a4d4c5; background: #e2f4ed; border-radius: 4px; }
+    .state.warn { color: #8e590f; border-color: #ddbe88; background: #fff6e6; }
+    .toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 16px; padding: 16px 0 18px; border-bottom: 1px solid #c8d5d0; }
+    .field { display: grid; gap: 5px; min-width: 190px; }
+    .field label { color: #53645d; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    input[type="search"], select { height: 36px; padding: 0 10px; border: 1px solid #bacac1; background: #fff; border-radius: 4px; color: #1c3027; }
+    input[type="search"] { min-width: 235px; }
+    .check { height: 36px; display: inline-flex; gap: 7px; align-items: center; color: #3d554a; }
+    .summary { display: flex; flex-wrap: wrap; gap: 0; padding: 13px 0; border-bottom: 1px solid #c8d5d0; font-size: 12px; color: #53665b; font-variant-numeric: tabular-nums; }
+    .summary span { padding: 2px 18px; border-left: 1px solid #c2d0c9; }
+    .summary span:first-child { padding-left: 0; border-left: 0; }
+    .summary strong { color: #183c31; font-size: 17px; margin-right: 5px; }
+    .notice { padding: 12px 14px; border-left: 3px solid #cb861c; background: #fff8e9; color: #765019; margin: 12px 0; font-size: 12px; }
+    .empty { padding: 42px 16px; color: #5b7065; text-align: center; }
+    .fleet { margin-top: 18px; border: 1px solid #cadbd2; border-top: 3px solid #2d7965; border-radius: 4px; background: #fff; overflow: hidden; }
+    .fleet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 16px; background: #eff5f1; }
+    .fleet-head h2 { font-size: 16px; margin: 0 0 3px; }
+    .fleet-head small { color: #596d60; }
+    .fleet-head .tag { background: #d5a14c; color: #29200d; padding: 3px 7px; border-radius: 3px; font-size: 11px; }
+    .columns, .row { display: grid; grid-template-columns: minmax(110px, 160px) minmax(105px, 140px) minmax(0, 1fr); align-items: center; gap: 12px; padding: 0 16px; }
+    .columns { min-height: 35px; background: #f7f9f8; border-bottom: 1px solid #dde6e0; color: #61736a; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    .row { min-height: 58px; border-bottom: 1px solid #e5ebe7; padding-top: 8px; padding-bottom: 8px; }
+    .row:last-child { border-bottom: 0; }
+    .unit { display: grid; gap: 4px; min-width: 0; }
+    .unit strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .unit small, .metric small { color: #6b7b71; font-size: 11px; }
+    .metric { display: grid; gap: 4px; font-variant-numeric: tabular-nums; }
+    .metric strong { font-size: 14px; }
+    .metric.muted strong { color: #8a968e; }
+    .metric.stale strong, .unit.stale small { color: #aa6511; }
+    .lane { position: relative; height: 82px; min-width: 0; margin: 0 16px; display: flex; align-items: center; }
+    .lane-track { position: absolute; height: 4px; top: 40px; left: 66px; right: 55px; background: #9ebbb0; border-radius: 2px; }
+    .lane-markers { position: absolute; inset: 0 55px 0 66px; }
+    .lane-track::after { content: ""; position: absolute; inset: 0; opacity: .3; background: repeating-linear-gradient(90deg,transparent 0 34px,#fff 34px 43px); }
+    .end { position: absolute; z-index: 1; font-weight: 700; font-size: 10px; color: #536b5c; background: white; padding: 2px; }
+    .end.left { left: 0; }.end.right { right: 0; }
+    .marker { position: absolute; z-index: 2; width: 22px; height: 22px; border-radius: 50%; background: #237c68; border: 2px solid #fff; box-shadow: 0 0 0 1px #237c68; transform: translateX(-50%); color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
+    .lane-unavailable { margin: auto; color: #a06416; font-size: 11px; background: #fff; padding: 2px 8px; z-index: 2; }
+    .distance-list { display: flex; flex-wrap: wrap; gap: 4px 18px; min-width: 0; font-variant-numeric: tabular-nums; }
+    .pair { white-space: normal; overflow-wrap: anywhere; font-size: 12px; }
+    .pair b { color: #305a4e; }
+    .pair.muted { color: #8a968e; }
+    .pair.muted b { color: #73857b; }
+    @media (max-width: 760px) {
+      header { padding: 10px 14px; }.brand { display: grid; gap: 1px; }.brand strong { font-size: 15px; }.brand span { font-size: 10px; }
+      .shell { padding: 15px 12px 30px; }.topline { flex-wrap: wrap; }.field { flex: 1; min-width: 135px; } input[type="search"] { min-width: 0; width: 100%; }
+      .columns { display: none; }.row { grid-template-columns: minmax(90px, 1fr) minmax(95px, 1fr); gap: 8px 10px; padding: 10px 12px; }.row .distance-list { grid-column: 1 / -1; }.lane { margin: 0 12px; }.lane-track { left: 54px; right: 42px; }.lane-markers { left: 54px; right: 42px; }.end { font-size: 8px; }.summary span { padding: 4px 10px; }.summary span:first-child { padding-left: 0; }
+    }
+    @media (max-width: 480px) {
+      header { flex-wrap: wrap; }.header-actions { width: 100%; justify-content: flex-start; }
+      .toolbar { gap: 10px; }.field { min-width: 0; flex-basis: calc(50% - 5px); }.check { width: 100%; }
+      .summary span { flex: 0 0 50%; padding: 5px 8px; border: 0; }.summary span:nth-child(odd) { padding-left: 0; }
+      .fleet-head { align-items: flex-start; }.fleet-head .tag { max-width: 42%; }
+      .distance-list { gap: 5px 12px; }.pair { max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><strong>VIREXA ONE / MTC</strong><span>Astha Virexa Technology</span></div>
+    <div class="header-actions"><button id="new-window" title="Buka MTC di jendela browser terpisah">Jendela baru</button><button id="refresh" title="Muat data terbaru">Muat ulang</button></div>
+  </header>
+  <main class="shell">
+    <div class="topline"><div><h1>Fleet movement &amp; spacing</h1><p class="sub">Satu koridor per excavator. Posisi dan jarak antar unit dihitung dari GPS aktual, bukan jarak tempuh jalan.</p></div><div id="state" class="state">Memuat data...</div></div>
+    <div class="toolbar">
+      <div class="field"><label for="fleet-filter">Excavator</label><select id="fleet-filter"><option value="">Semua fleet</option></select></div>
+      <div class="field"><label for="search">Cari unit</label><input id="search" type="search" placeholder="Nama truck atau excavator"></div>
+      <label class="check"><input id="fresh-only" type="checkbox"> Hanya GPS aktif</label>
+    </div>
+    <div id="summary" class="summary"></div>
+    <div id="notice" class="notice" hidden></div>
+    <div id="fleets"></div>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    const meters = (value) => value == null ? '--' : value < 1000 ? `${Math.round(value)} m` : `${(value / 1000).toFixed(2)} km`;
+    const distance = (a, b) => Math.hypot(a.easting - b.easting, a.northing - b.northing);
+    let snapshot = null;
+    let loading = false;
+
+    function buildFleets(response) {
+      const data = response.data || {};
+      const units = new Map((data.units || []).map((unit) => [String(unit.unit_id), unit]));
+      const latest = new Map();
+      for (const assignment of data.assignments || []) {
+        if (assignment.truck_id == null || assignment.shovel_id == null) continue;
+        const key = String(assignment.truck_id);
+        const previous = latest.get(key);
+        const updated = Date.parse(assignment.updated_at || '') || 0;
+        const previousUpdated = previous ? Date.parse(previous.updated_at || '') || 0 : -1;
+        if (!previous || updated > previousUpdated || (updated === previousUpdated && assignment.dispatch_id > previous.dispatch_id)) latest.set(key, assignment);
+      }
+      const fleets = new Map();
+      for (const assignment of latest.values()) {
+        const key = String(assignment.shovel_id);
+        if (!fleets.has(key)) fleets.set(key, { id: key, name: assignment.shovel_name || `EX ${key}`, shovel: units.get(key), trucks: [] });
+        const fleet = fleets.get(key);
+        fleet.trucks.push({ assignment, unit: units.get(String(assignment.truck_id)) });
+      }
+      return [...fleets.values()].sort((a, b) => a.name.localeCompare(b.name, 'id', { numeric: true }));
+    }
+
+    function isFresh(unit) {
+      const generated = Date.parse(snapshot.generated_at || '');
+      const elapsed = Number.isFinite(generated) ? Math.max(0, (Date.now() - generated) / 1000) : 0;
+      return unit && unit.gps_valid && Number.isFinite(unit.easting) && Number.isFinite(unit.northing) && unit.gps_age_seconds >= 0 && unit.gps_age_seconds + elapsed <= (snapshot.gps_fresh_seconds || 120);
+    }
+
+    function assignmentAge(assignment) {
+      const time = Date.parse(assignment.updated_at || '');
+      return Number.isFinite(time) ? Math.max(0, (Date.now() - time) / 1000) : Infinity;
+    }
+
+    function render() {
+      if (!snapshot) return;
+      const fleets = buildFleets(snapshot);
+      const selected = $('fleet-filter').value;
+      const options = `<option value="">Semua fleet</option>` + fleets.map((fleet) => `<option value="${escapeHtml(fleet.id)}">${escapeHtml(fleet.name)} (${fleet.trucks.length})</option>`).join('');
+      if ($('fleet-filter').innerHTML !== options) $('fleet-filter').innerHTML = options;
+      $('fleet-filter').value = fleets.some((fleet) => fleet.id === selected) ? selected : '';
+      const query = $('search').value.trim().toLowerCase();
+      const freshOnly = $('fresh-only').checked;
+      let count = 0, liveCount = 0, staleAssignments = 0, shownFleets = 0;
+      const html = fleets.filter((fleet) => !$('fleet-filter').value || fleet.id === $('fleet-filter').value).map((fleet) => {
+        const shovelFresh = isFresh(fleet.shovel);
+        const allTrucks = fleet.trucks.map((item) => {
+          const fresh = isFresh(item.unit);
+          const range = fresh && shovelFresh ? distance(item.unit, fleet.shovel) : null;
+          return { ...item, fresh, range, oldAssignment: assignmentAge(item.assignment) > 12 * 3600 };
+        }).sort((a, b) => (a.assignment.truck_name || '').localeCompare(b.assignment.truck_name || '', 'id', { numeric: true }));
+        allTrucks.forEach((item, index) => { item.number = index + 1; });
+        const trucks = allTrucks.filter((item) => (!query || `${item.assignment.truck_name} ${fleet.name}`.toLowerCase().includes(query)) && (!freshOnly || item.fresh));
+        if (!trucks.length) return '';
+        shownFleets++;
+        count += trucks.length;
+        liveCount += trucks.filter((item) => item.fresh).length;
+        staleAssignments += trucks.filter((item) => item.oldAssignment).length;
+        const maxRange = Math.max(1, ...allTrucks.map((item) => item.range ?? 0));
+        const markers = allTrucks.filter((item) => item.range != null).map((item) => {
+          const position = Math.max(2, Math.min(98, 98 - 96 * item.range / maxRange));
+          const name = item.assignment.truck_name || item.unit?.unit_name || '--';
+          return `<span class="marker" style="left:${position}%;top:${19 + (item.number % 3) * 11}px" title="${escapeHtml(name)}: ${meters(item.range)} ke ${escapeHtml(fleet.name)}">${item.number}</span>`;
+        }).join('');
+        const lane = `<div class="lane" aria-label="Posisi skematis ${escapeHtml(fleet.name)}"><span class="end left">DISPOSAL</span><div class="lane-track"></div><span class="end right">EX</span><div class="lane-markers">${markers}</div>${markers ? '' : '<span class="lane-unavailable">Posisi GPS belum tersedia</span>'}</div>`;
+        const rows = trucks.map((item) => {
+          const name = escapeHtml(item.assignment.truck_name || item.unit?.unit_name || '--');
+          const age = item.unit ? `${Math.round(item.unit.gps_age_seconds / 60)} menit lalu` : 'tanpa data unit';
+          const pairs = allTrucks.filter((other) => other !== item).map((other) => {
+            const pairDistance = item.fresh && other.fresh ? distance(item.unit, other.unit) : null;
+            const otherName = escapeHtml(other.assignment.truck_name || other.unit?.unit_name || '--');
+            return `<span class="pair ${pairDistance == null ? 'muted' : ''}"><b>${otherName}</b> ${meters(pairDistance)}</span>`;
+          }).join('');
+          return `<div class="row"><div class="unit ${item.fresh ? '' : 'stale'}"><strong>${item.number}. ${name}</strong><small>${item.oldAssignment ? 'Assignment lama' : item.fresh ? `${escapeHtml(item.unit.activity_name || 'Aktif')} · ${Math.round(item.unit.speed_kmh || 0)} km/j` : `GPS lama · ${escapeHtml(age)}`}</small></div>
+            <div class="metric ${item.range == null ? 'muted' : ''}"><strong>${meters(item.range)}</strong><small>ke EX · GPS lurus</small></div>
+            <div class="distance-list">${pairs || '<span class="pair muted">Belum ada unit lain di fleet</span>'}</div></div>`;
+        }).join('');
+        return `<section class="fleet"><div class="fleet-head"><div><h2>${escapeHtml(fleet.name)}</h2><small>${allTrucks.length} unit ditugaskan · ${shovelFresh ? 'GPS excavator aktif' : 'GPS excavator lama / tidak tersedia'}</small></div>${allTrucks.some((item) => item.oldAssignment) ? '<span class="tag">Assignment perlu verifikasi</span>' : ''}</div>${lane}<div class="columns"><span>Unit</span><span>Jarak ke EX</span><span>Jarak ke unit lain dalam fleet · GPS lurus</span></div>${rows}</section>`;
+      }).join('');
+      $('fleets').innerHTML = html || '<div class="empty">Tidak ada unit yang cocok dengan filter atau belum ada assignment aktual.</div>';
+      $('summary').innerHTML = `<span><strong>${shownFleets}</strong> fleet ditampilkan</span><span><strong>${count}</strong> unit ditampilkan</span><span><strong>${liveCount}</strong> GPS aktif</span><span><strong>${staleAssignments}</strong> assignment lama</span>`;
+      const messages = [];
+      if (!(snapshot.data?.units?.length) || !(snapshot.data?.assignments?.length)) messages.push('Data fleet atau assignment belum tersedia dari backend. Tidak ada data simulasi yang ditampilkan.');
+      if (snapshot.data?.units?.length && !snapshot.data.units.some(isFresh)) messages.push('Semua titik GPS saat ini lama. Jarak dan posisi unit disembunyikan sampai telemetri terbaru tersedia.');
+      if (staleAssignments) messages.push(`${staleAssignments} assignment lebih dari 12 jam; pastikan masih berlaku sebelum mengambil keputusan dispatch.`);
+      $('notice').hidden = !messages.length;
+      $('notice').textContent = messages.join(' ');
+    }
+
+    async function refresh() {
+      if (loading) return;
+      loading = true;
+      $('state').textContent = 'Memperbarui...';
+      try {
+        const response = await fetch('/api/v1/mtc/live', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        snapshot = await response.json();
+        render();
+        $('state').className = snapshot.status === 'success' ? 'state' : 'state warn';
+        $('state').textContent = `Diperbarui ${new Date(snapshot.generated_at).toLocaleTimeString('id-ID')} · ${snapshot.status === 'success' ? 'Terhubung' : 'Data terbatas'}`;
+      } catch (error) {
+        $('state').className = 'state warn';
+        $('state').textContent = `Koneksi terganggu · ${error.message}`;
+        if (snapshot) render();
+        if (!snapshot) $('fleets').innerHTML = '<div class="empty">Data MTC belum dapat dimuat.</div>';
+      } finally { loading = false; }
+    }
+
+    $('new-window').addEventListener('click', () => {
+      const popup = window.open(location.href, 'VirexaMTC', 'popup=yes,width=1440,height=900,resizable=yes,scrollbars=yes');
+      if (!popup) $('state').textContent = 'Izinkan pop-up untuk membuka jendela baru.';
+    });
+    $('refresh').addEventListener('click', refresh);
+    for (const id of ['fleet-filter', 'search', 'fresh-only']) $(id).addEventListener(id === 'search' ? 'input' : 'change', render);
+    refresh();
+    setInterval(refresh, 10000);
+  </script>
+</body>
+</html>

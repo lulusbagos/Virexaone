@@ -1,0 +1,337 @@
+[Licensing::Module] Trying to connect to existing licensing client channel...
+Built from '6000.4/staging' branch; Version is '6000.4.10f1 (feeafc12a938) revision 16706300'; Using compiler version '194234433'; Build Type 'Release'
+OS: 'Windows 11  (10.0.26100) Professional' Language: 'en' Physical Memory: 32560 MB
+BatchMode: 1, IsHumanControllingUs: 0, StartBugReporterOnCrash: 0, Is64bit: 1
+[Licensing::IpcConnector] Channel LicenseClient-lulus.hermawan doesn't exist
+System  architecture: x64
+Process architecture: x64
+Date: 2026-09-17T13:43:08Z
+[Licensing::Module] Successfully launched the LicensingClient (PId: 32068)
+
+COMMAND LINE ARGUMENTS:
+C:\Program Files\Unity\Hub\Editor\6000.4.10f1\Editor\Unity.exe
+-projectPath
+d:\4. PROJECT\20. Astha\Virexa v.2
+-quit
+-batchmode
+-logFile
+d:\4. PROJECT\20. Astha\Virexa v.2\build_log.txt
+Successfully changed project path to: d:\4. PROJECT\20. Astha\Virexa v.2
+D:/4. PROJECT/20. Astha/Virexa v.2
+[UnityMemory] Configuration Parameters - Can be set up in boot.config
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-nav-mesh-worker=65536"
+    "memorysetup-temp-allocator-size-audio-worker=65536"
+    "memorysetup-temp-allocator-size-cloud-worker=32768"
+    "memorysetup-temp-allocator-size-gfx=262144"
+    "memorysetup-temp-allocator-size-preload-manager=33554432"
+    "memorysetup-temp-allocator-size-job-worker=262144"
+    "memorysetup-temp-allocator-size-background-worker=32768"
+    "memorysetup-allocator-temp-initial-block-size-main=262144"
+    "memorysetup-allocator-temp-initial-block-size-worker=262144"
+    "memorysetup-bucket-allocator-granularity=16"
+    "memorysetup-bucket-allocator-bucket-count=8"
+    "memorysetup-bucket-allocator-block-size=33554432"
+    "memorysetup-bucket-allocator-block-count=8"
+    "memorysetup-main-allocator-block-size=16777216"
+    "memorysetup-thread-allocator-block-size=16777216"
+    "memorysetup-gfx-main-allocator-block-size=16777216"
+    "memorysetup-gfx-thread-allocator-block-size=16777216"
+    "memorysetup-cache-allocator-block-size=4194304"
+    "memorysetup-typetree-allocator-block-size=2097152"
+    "memorysetup-profiler-bucket-allocator-granularity=16"
+    "memorysetup-profiler-bucket-allocator-bucket-count=8"
+    "memorysetup-profiler-bucket-allocator-block-size=33554432"
+    "memorysetup-profiler-bucket-allocator-block-count=8"
+    "memorysetup-profiler-allocator-block-size=16777216"
+    "memorysetup-profiler-editor-allocator-block-size=1048576"
+    "memorysetup-temp-allocator-size-main=16777216"
+    "memorysetup-job-temp-allocator-block-size=2097152"
+    "memorysetup-job-temp-allocator-block-size-background=1048576"
+    "memorysetup-job-temp-allocator-reduction-small-platforms=262144"
+Player connection [31980]  Target information:
+
+Player connection [31980]  * "[IP] 10.88.234.2 [Port] 55504 [Flags] 2 [Guid] 3901714137 [EditorId] 3901714137 [Version] 1048832 [Id] WindowsEditor(7,IDC11SYSL12) [Debug] 1 [PackageName] WindowsEditor [ProjectName] Editor" 
+
+Player connection [31980]  * "[IP] 192.168.0.5 [Port] 55504 [Flags] 2 [Guid] 3901714137 [EditorId] 3901714137 [Version] 1048832 [Id] WindowsEditor(7,IDC11SYSL12) [Debug] 1 [PackageName] WindowsEditor [ProjectName] Editor" 
+
+Player connection [31980] Host joined multi-casting on [225.0.0.222:54997]...
+Player connection [31980] Host joined alternative multi-casting on [225.0.0.222:34997]...
+Input System module state changed to: Initialized.
+[Physics::Module] Initialized fallback backend.
+[Physics::Module] Id: 0xdecafbad
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-lulus.hermawan" at "2026-09-17T13:43:09.4739973Z"
+[Licensing::Client] Code 10 while verifying Licensing Client signature (process Id: 32068, path: "C:/Program Files/Unity/Hub/Editor/6000.4.10f1/Editor/Data/Resources/Licensing/Client/Unity.Licensing.Client.exe")
+[Licensing::Module] LicensingClient has failed validation; ignoring
+[Package Manager] Connected to IPC stream "Upm-4072" after 0.3 seconds.
+[Licensing::Module] Licensing is not yet initialized.
+[Licensing::Client] Handshaking with LicensingClient:
+  Version:                 1.18.1+9fbee8e
+  Session Id:              9f0ee4300c984a41b2b55c12d16df64c
+  Correlation Id:          c3c499b6398ff1658d541b0e544a1836
+  External correlation Id: 2820950368172937195
+  Machine Id:              UVcRiMcvRXBxyIJw22qbzhJRrVk=
+[Licensing::Module] Successfully connected to LicensingClient on channel: "LicenseClient-lulus.hermawan" (connect: 0.56s, validation: 0.27s, handshake: 0.05s)
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-lulus.hermawan-notifications" at "2026-09-17T13:43:09.789995Z"
+[Licensing::Module] Connected to LicensingClient (PId: 32068, launch time: 0.01, total connection time: 0.88s)
+[Licensing::Module] Error: Access token is unavailable; failed to update
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Module] License group:
+  Id: 18968377728518-UnityPersXXXX
+  Product: Unity Personal
+  Type: Assigned
+  Expiration: Unlimited
+[Licensing::Client] Successfully updated license, isAsync: True, time: 0.01
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Module] Licensing Background thread has ended after 0.92s
+[Licensing::Module] Licensing is initialized (took 0.13s).
+[Licensing::Client] Successfully resolved entitlement details
+Library Redirect Path: Library/
+[Physics::Module] Selected backend.
+[Physics::Module] Name: PhysX
+[Physics::Module] Id: 0xf2b8ea05
+[Physics::Module] SDK Version: 4.1.2
+[Physics::Module] Integration Version: 1.0.0
+[Physics::Module] Threading Mode: Multi-Threaded
+Artifact Garbage Collection - Removed 3 unused hashed content files
+Initialize engine version: 6000.4.10f1 (feeafc12a938)
+[Subsystems] Discovering subsystems at path C:/Program Files/Unity/Hub/Editor/6000.4.10f1/Editor/Data/Resources/UnitySubsystems
+[Subsystems] Discovering subsystems at path D:/4. PROJECT/20. Astha/Virexa v.2/Assets
+GfxDevice: creating device client; kGfxThreadingModeNonThreaded
+d3d12: failed to query info queue interface (0x80004002).
+Direct3D:
+    Version:         Direct3D 12 [level 12.2]
+    Renderer:        NVIDIA GeForce RTX 3060 Laptop GPU (ID=0x2560)
+    Vendor:          NVIDIA
+    VRAM:            5994 MB
+    App VRAM Budget: 5226 MB
+    Driver:          32.0.15.9144
+Initialize mono
+Mono path[0] = 'C:/Program Files/Unity/Hub/Editor/6000.4.10f1/Editor/Data/Managed'
+Mono path[1] = 'C:/Program Files/Unity/Hub/Editor/6000.4.10f1/Editor/Data/MonoBleedingEdge/lib/mono/unityjit-win32'
+Mono config path = 'C:/Program Files/Unity/Hub/Editor/6000.4.10f1/Editor/Data/MonoBleedingEdge/etc'
+Using monoOptions --debugger-agent=transport=dt_socket,embedding=1,server=y,suspend=n,address=127.0.0.1:56072
+CodeReloadManager initialized
+Using cacheserver namespaces - metadata:defaultmetadata, artifacts:defaultartifacts
+Using cacheserver namespaces - metadata:defaultmetadata, artifacts:defaultartifacts
+ImportWorker Server TCP listen port: 0
+AcceleratorClientConnectionCallback - disconnected - :0
+Begin MonoManager ReloadAssembly
+Registering precompiled unity dll's ...
+Register platform support module: C:/Program Files/Unity/Hub/Editor/6000.4.10f1/Editor/Data/PlaybackEngines/WindowsStandaloneSupport/UnityEditor.WindowsStandalone.Extensions.dll
+Registered in 0.001786 seconds.
+Native extension for WindowsStandalone target not found
+Package Manager log level set to [2]
+ScheduleIndexationOnStartup MainProcess:False IndexOnStartup:True
+Mono: successfully reloaded assembly
+- Finished resetting the current domain, in  0.362 seconds
+Domain Reload Profiling: 764ms
+	BeginReloadAssembly (132ms)
+		CreateAndSetChildDomain (15ms)
+	RebuildCommonClasses (33ms)
+	RebuildNativeTypeToScriptingClass (10ms)
+	initialDomainReloadingComplete (62ms)
+	LoadAllAssembliesAndSetupDomain (162ms)
+		LoadAssemblies (115ms)
+		AnalyzeDomain (153ms)
+			TypeCache.Refresh (151ms)
+				TypeCache.ScanAssembly (140ms)
+	FinalizeReload (364ms)
+		SetupLoadedEditorAssemblies (0ms)
+			InitializePlatformSupportModulesInManaged (41ms)
+			BeforeProcessingInitializeOnLoad (79ms)
+			ProcessInitializeOnLoadAttributes (96ms)
+			ProcessInitializeOnLoadMethodAttributes (88ms)
+[Licensing::Client] Successfully resolved entitlement details
+Application.AssetDatabase Initial Refresh Start
+[Package Manager] Restoring resolved packages state from cache
+[Licensing::Client] Successfully resolved entitlement details
+[Package Manager] Registered 38 packages:
+  Built-in packages:
+    com.unity.ugui@2.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.ugui@1f2d1ab0d950)
+    com.unity.multiplayer.center@1.0.1 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.multiplayer.center@f01f4ba8d00a)
+    com.unity.modules.accessibility@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.accessibility)
+    com.unity.modules.adaptiveperformance@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.adaptiveperformance)
+    com.unity.modules.ai@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.ai)
+    com.unity.modules.androidjni@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.androidjni)
+    com.unity.modules.animation@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.animation)
+    com.unity.modules.assetbundle@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.assetbundle)
+    com.unity.modules.audio@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.audio)
+    com.unity.modules.cloth@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.cloth)
+    com.unity.modules.director@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.director)
+    com.unity.modules.imageconversion@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.imageconversion)
+    com.unity.modules.imgui@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.imgui)
+    com.unity.modules.jsonserialize@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.jsonserialize)
+    com.unity.modules.particlesystem@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.particlesystem)
+    com.unity.modules.physics@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.physics)
+    com.unity.modules.physics2d@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.physics2d)
+    com.unity.modules.screencapture@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.screencapture)
+    com.unity.modules.terrain@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.terrain)
+    com.unity.modules.terrainphysics@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.terrainphysics)
+    com.unity.modules.tilemap@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.tilemap)
+    com.unity.modules.ui@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.ui)
+    com.unity.modules.uielements@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.uielements)
+    com.unity.modules.umbra@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.umbra)
+    com.unity.modules.unityanalytics@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.unityanalytics)
+    com.unity.modules.unitywebrequest@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.unitywebrequest)
+    com.unity.modules.unitywebrequestassetbundle@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.unitywebrequestassetbundle)
+    com.unity.modules.unitywebrequestaudio@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.unitywebrequestaudio)
+    com.unity.modules.unitywebrequesttexture@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.unitywebrequesttexture)
+    com.unity.modules.unitywebrequestwww@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.unitywebrequestwww)
+    com.unity.modules.vectorgraphics@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.vectorgraphics)
+    com.unity.modules.vehicles@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.vehicles)
+    com.unity.modules.video@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.video)
+    com.unity.modules.vr@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.vr)
+    com.unity.modules.wind@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.wind)
+    com.unity.modules.xr@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.xr)
+    com.unity.modules.subsystems@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.subsystems)
+    com.unity.modules.hierarchycore@1.0.0 (location: D:\4. PROJECT\20. Astha\Virexa v.2\Library\PackageCache\com.unity.modules.hierarchycore)
+[Subsystems] No new subsystems found in resolved package list.
+[Package Manager] Done registering packages in 0.02 seconds
+[ScriptCompilation] Requested script compilation because: AssetDatabase observed changes in script compilation related files
+Starting: C:\Program Files\Unity\Hub\Editor\6000.4.10f1\Editor\Data\Tools\BuildPipeline\bee_backend.exe --ipc --defer-dag-verification --dagfile="Library/Bee/1900b0aEDbg.dag" --continue-on-failure --profile="Library/Bee/backend1.traceevents" ScriptAssemblies
+WorkingDir: D:/4. PROJECT/20. Astha/Virexa v.2
+DisplayProgressbar: Compiling Scripts
+Starting: C:\Program Files\Unity\Hub\Editor\6000.4.10f1\Editor\Data\netcorerun\netcorerun.exe "C:\Program Files\Unity\Hub\Editor\6000.4.10f1\Editor\Data\Tools\BuildPipeline\ScriptCompilationBuildProgram.exe" "Library/Bee/1900b0aEDbg.dag.json" "Library/Bee/1900b0aEDbg-inputdata.json" "Library\Bee\buildprogram0.traceevents"
+ExitCode: 4 Duration: 0s96ms
+WorkingDir: D:/4. PROJECT/20. Astha/Virexa v.2
+Rebuilding DAG because FileSignature timestamp changed: Library/Bee/1900b0aEDbg-inputdata.json
+*** Tundra requires additional run (0.03 seconds), 0 items updated, 182 evaluated
+ExitCode: 0 Duration: 0s309ms
+Starting: C:\Program Files\Unity\Hub\Editor\6000.4.10f1\Editor\Data\Tools\BuildPipeline\bee_backend.exe --ipc --defer-dag-verification --dagfile="Library/Bee/1900b0aEDbg.dag" --continue-on-failure --dagfilejson="Library\Bee\1900b0aEDbg.dag.json" --profile="Library/Bee/backend2.traceevents" ScriptAssemblies
+WorkingDir: D:/4. PROJECT/20. Astha/Virexa v.2
+ExitCode: 0 Duration: 1s797ms
+Finished compiling graph: 233 nodes, 2070 flattened edges (1946 ToBuild, 20 ToUse), maximum node priority 118
+[187/230    0s] WriteText Library/Bee/artifacts/1900b0aEDbg.dag/Assembly-CSharp.rsp
+[224/230    1s] Csc Library/Bee/artifacts/1900b0aEDbg.dag/Assembly-CSharp.dll (+2 others)
+[225/230    0s] CopyFiles Library/ScriptAssemblies/Assembly-CSharp.pdb
+[226/230    0s] CopyFiles Library/ScriptAssemblies/Assembly-CSharp.dll
+[227/230    0s] Csc Library/Bee/artifacts/1900b0aEDbg.dag/Assembly-CSharp-Editor.dll (+2 others)
+[228/230    0s] CopyFiles Library/ScriptAssemblies/Assembly-CSharp-Editor.pdb
+[229/230    0s] CopyFiles Library/ScriptAssemblies/Assembly-CSharp-Editor.dll
+*** Tundra build success (1.74 seconds), 7 items updated, 230 evaluated
+AssetDatabase: script compilation time: 2.763314s
+Begin MonoManager ReloadAssembly
+Assembly Assembly-CSharp-Editor-firstpass.dll at Library/ScriptAssemblies/Assembly-CSharp-Editor-firstpass.dll not valid. Loading of assembly skipped.
+Assembly Assembly-CSharp-firstpass.dll at Library/ScriptAssemblies/Assembly-CSharp-firstpass.dll not valid. Loading of assembly skipped.
+Assembly Unity.Multiplayer.Center.Editor.Tests.dll at Library/ScriptAssemblies/Unity.Multiplayer.Center.Editor.Tests.dll not valid. Loading of assembly skipped.
+Assembly Unity.Multiplayer.Center.Tests.dll at Library/ScriptAssemblies/Unity.Multiplayer.Center.Tests.dll not valid. Loading of assembly skipped.
+Assembly Unity.TextMeshPro.Editor.Tests.dll at Library/ScriptAssemblies/Unity.TextMeshPro.Editor.Tests.dll not valid. Loading of assembly skipped.
+Assembly Unity.TextMeshPro.Tests.dll at Library/ScriptAssemblies/Unity.TextMeshPro.Tests.dll not valid. Loading of assembly skipped.
+Assembly UnityEditor.UI.Common.Tests.dll at Library/ScriptAssemblies/UnityEditor.UI.Common.Tests.dll not valid. Loading of assembly skipped.
+Assembly UnityEditor.UI.EditorTests.dll at Library/ScriptAssemblies/UnityEditor.UI.EditorTests.dll not valid. Loading of assembly skipped.
+Assembly UnityEngine.UI.Tests.dll at Library/ScriptAssemblies/UnityEngine.UI.Tests.dll not valid. Loading of assembly skipped.
+Native extension for WindowsStandalone target not found
+ScheduleIndexationOnStartup MainProcess:True IndexOnStartup:True
+Mono: successfully reloaded assembly
+- Finished resetting the current domain, in  0.390 seconds
+Domain Reload Profiling: 842ms
+	BeginReloadAssembly (333ms)
+		DisableScriptedObjects (40ms)
+		CreateAndSetChildDomain (151ms)
+	RebuildCommonClasses (32ms)
+	RebuildNativeTypeToScriptingClass (11ms)
+	initialDomainReloadingComplete (44ms)
+	LoadAllAssembliesAndSetupDomain (30ms)
+		LoadAssemblies (109ms)
+		AnalyzeDomain (18ms)
+			TypeCache.Refresh (10ms)
+				TypeCache.ScanAssembly (6ms)
+			BuildScriptInfoCaches (4ms)
+	FinalizeReload (393ms)
+		SetupLoadedEditorAssemblies (0ms)
+			InitializePlatformSupportModulesInManaged (19ms)
+			BeforeProcessingInitializeOnLoad (106ms)
+			ProcessInitializeOnLoadAttributes (71ms)
+			ProcessInitializeOnLoadMethodAttributes (46ms)
+			AfterProcessingInitializeOnLoad (4ms)
+		AwakeInstancesAfterBackupRestoration (21ms)
+Start importing Assets/Scenes/FMS_Mine_Main.unity using Guid(c23c36670bd8b7e45892b0acec703849) (DefaultImporter) -> (Import Result ID: '53e981ba27bb185aebc4f0b2def857f6') in 0.0082423 seconds [static dependencies only]. Details - ImportResultOutputID=790a0358dae6738a07346a7afeb5effe DependenciesID=f9749f84e59aefcc4df7da78cf3f03b0 StaticDependenciesID=d50d003765fce7fa8cd0b53c2d84f562 
+Start importing Assets/Textures/geotiff_ortho_4k.jpg using Guid(a525bd9db12a34c418a082bcc0ed8c6a) (TextureImporter) -> (Import Result ID: '8174cadd332a769524b11ed2b4811c98') in 0.5270211 seconds [static and dynamic dependencies]. Details - ImportResultOutputID=082b3a4faa9479c719e37b9eac8479e2 DependenciesID=3e6bbf4134e9645cb6cfb5b706dcfdc4 StaticDependenciesID=fa2198f3fb84d0d67453718322c2c307 
+Start importing Assets/Textures/geotiff_raw_preview.jpg using Guid(dc223c91df44f6c489740660355306e0) (TextureImporter) -> (Import Result ID: '8fd5c3aaf7f15408113063e5468beb1d') in 0.3416021 seconds [static and dynamic dependencies]. Details - ImportResultOutputID=ea5210e3816af1bb95fd81604940cf44 DependenciesID=e604d92021e92d72360f2c2059383bdd StaticDependenciesID=95426c1e02c729738f01dbff84ca3b8e 
+Start importing Assets/Materials/Terrain_GeoTIFF_Mat.mat using Guid(098a31ed4e6bfef40847f2a5cebdf874) (NativeFormatImporter) -> (Import Result ID: 'bd94ee6f1307a0344db72970848a8a9b') in 0.0019468 seconds [static dependencies only]. Details - ImportResultOutputID=b6e2031915bd7c1957aa919af1c32409 DependenciesID=0cf4345eec510e516c89edde39dc325b StaticDependenciesID=db7907f27e09bd2b4745115e4b1e7f6c 
+Start importing Assets/Data/terrain_elevation.bytes using Guid(d4a5b6c7e8f90123456789abcdef0123) (TextScriptImporter) -> (Import Result ID: '74c911419f96d9bb79cb3e9d1fb0f123') in 0.0029613 seconds [static dependencies only]. Details - ImportResultOutputID=e7f6b5cfd29739a71d443ce92f4a0396 DependenciesID=490489e433579e21ea823523af8e487a StaticDependenciesID=59867bea755299c0d85f0381ee6cb307 
+Start importing Assets/Data/mine_spatial_metadata.json using Guid(e8e49b2998a7e3f49ae069992f00b196) (TextScriptImporter) -> (Import Result ID: '876e06155162f5f1b130b42f1d4119a5') in 0.001906 seconds [static dependencies only]. Details - ImportResultOutputID=ace08782eaff64bd2e67d316268ed525 DependenciesID=9ae35b8092d752cb38661001b5eebde2 StaticDependenciesID=e51acd7810c7bb11fa9ee4824e515ad5 
+(Values over 0.050ms)
+Asset Pipeline Refresh (id=0c6c73146d297ac4a8ce07b567a1c909): Total: 4.709 seconds - Initiated by InitialRefreshV2(ForceSynchronousImport)
+	Summary:
+		Imports: total=6 (actual=6, local cache=0, cache server=0)
+		Asset DB Process Time: managed=3 ms, native=1402 ms
+		Asset DB Callback time: managed=53 ms, native=20 ms
+		Scripting: domain reloads=1, domain reload time=452 ms, compile time=2765 ms, other=11 ms
+		Project Asset Count: scripts=207, non-scripts=132
+		Asset File Changes: new=3, changed=8, moved=0, deleted=0
+		Scan Filter Count: 0
+	InvokePackagesCallback: 22.681ms
+	ApplyChangesToAssetFolders: 0.417ms
+	Scan: 41.269ms
+	OnSourceAssetsModified: 0.638ms
+	CategorizeScriptCompilationAssets: 0.988ms
+	ProcessAssetsWithTransientArtifactChanges: 6.052ms
+	CategorizeAssets: 1.763ms
+	CompileScripts: 2764.709ms
+	ImportOutOfDateAssets: 1281.153ms (393.771ms without children)
+		ImportManagerImport: 887.113ms (1.265ms without children)
+		UnloadImportedAssets: 0.085ms
+		EnsureUptoDateAssetsAreRegisteredWithGuidPM: 0.051ms
+		OnDemandSchedulerStart: 0.124ms
+	PostProcessAllAssets: 52.648ms
+		MonoPostProcessAllAssets: 52.162ms
+			AssetPostprocessor.OnPostprocessAllAssets 14.234ms
+			StyleCatalogPostProcessor.OnPostprocessAllAssets 13.091ms
+			WindowAssetPostprocessingWatcher.OnPostprocessAllAssets 5.912ms
+			BuilderAssetPostprocessor.OnPostprocessAllAssets 3.580ms
+			AssetChangedListener.OnPostprocessAllAssets 1.631ms
+			TextAssetPostProcessor.OnPostprocessAllAssets 1.348ms
+			SyncVS.PostprocessSyncProject 1.252ms
+			RetainedModeAssetPostprocessor.OnPostprocessAllAssets 1.197ms
+			SpeedTree9Postprocessor.OnPostprocessAllAssets 0.619ms
+			ArtifactBrowserPostProcessor.OnPostprocessAllAssets 0.454ms
+			TMPro_TexturePostProcessor.OnPostprocessAllAssets 0.396ms
+			ReferencedClipsPostProcessor.OnPostprocessAllAssets 0.251ms
+			AudioMixerPostprocessor.OnPostprocessAllAssets 0.230ms
+			AssetEvents.OnPostprocessAllAssets 0.211ms
+			TerrainToolbarOverlayPostProcessor.OnPostprocessAllAssets 0.204ms
+			ScenarioDriftAssetsTracker.OnPostprocessAllAssets 0.191ms
+			ConfigAssetsTracker.OnPostprocessAllAssets 0.161ms
+			SpeedTreePostProcessor.OnPostprocessAllAssets 0.154ms
+			AssetDatabaseCallbacks.OnPostprocessAllAssets 0.148ms
+			RenderPipelineGlobalSettingsPostprocessor.OnPostprocessAllAssets 0.080ms
+			AudioContainerPostProcessor.OnPostprocessAllAssets 0.057ms
+	PostAssetChangesProfiler: 0.682ms
+	UnloadStreamsBegin: 1.287ms
+	PersistCurrentRevisions: 0.124ms
+	GenerateScriptTypeHashes: 0.192ms
+	GenerateScriptTypeSerializationHashes: 0.421ms
+	Untracked: 526.064ms
+
+Application.AssetDatabase Initial Refresh End
+Launched and connected shader compiler UnityShaderCompiler.exe after 0.03 seconds
+Scanning for USB devices : 2.827ms
+Initializing Unity extensions:
+[MODES] ModeService[none].Initialize
+[MODES] ModeService[none].LoadModes
+[MODES] Loading mode Default (0) for mode-current-id-Virexa v.2
+Unloading 4 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 444 unused Assets / (0.7 MB). Loaded Objects now: 1083.
+Memory consumption went from 97.0 MB to 96.3 MB.
+Total: 3.768000 ms (FindLiveObjects: 0.063700 ms CreateObjectMapping: 0.016400 ms MarkObjects: 3.367500 ms  DeleteObjects: 0.318300 ms)
+
+Batchmode quit successfully invoked - shutting down!
+Curl error 42: Callback aborted
+[Physics::Module] Cleanup current backend.
+[Physics::Module] Id: 0xf2b8ea05
+Input System module state changed to: ShutdownInProgress.
+Input Polling Thread exited.
+Input System module state changed to: Shutdown.
+[Licensing::IpcConnector] LicenseClient-lulus.hermawan-notifications channel disconnected successfully.
+[Licensing::IpcConnector] LicenseClient-lulus.hermawan channel disconnected successfully.
+AcceleratorClientConnectionCallback - disconnected - :0
+Cleanup mono
+CodeReloadManager destroyed
+Exiting batchmode successfully now!
+Exiting without the bug reporter. Application will terminate with return code 0
