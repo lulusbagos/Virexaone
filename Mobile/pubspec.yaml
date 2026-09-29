@@ -36,7 +36,7 @@ dependencies:
   http: ^1.2.2
   intl: ^0.20.3
   web_socket_channel: ^3.0.3
-  shared_preferences: ^2.5.5
+  shared_preferences: 2.3.5
   audioplayers: ^6.8.1
   record: ^7.1.1
   flutter_pcm_sound: ^3.3.3
