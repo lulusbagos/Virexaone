@@ -32,7 +32,7 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
   List<Map<String, dynamic>> messages = [];
 
   final List<Map<String, dynamic>> quickPresets = [
-    {'icon': '🚜', 'label': 'SIAP MUAT', 'text': 'Unit siap muat di Front'},
+    {'icon': '🚜', 'label': 'SIAP MUAT', 'text': 'Unit siap muat di Front Gali'},
     {'icon': '🚛', 'label': 'MENUJU FRONT', 'text': 'Sedang traveling menuju Front Gali'},
     {'icon': '🛑', 'label': 'ANTRE DISPOSAL', 'text': 'Antre dumping di Disposal'},
     {'icon': '📦', 'label': 'SELESAI DUMP', 'text': 'Selesai dumping, kembali ke front'},
@@ -56,7 +56,7 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
     live.addListener(_onLiveChanged);
     _initAutoConnection();
 
-    poll = Timer.periodic(const Duration(seconds: 3), (_) {
+    poll = Timer.periodic(const Duration(seconds: 2), (_) {
       if (!serviceEnabled || unitKey == null) {
         _initAutoConnection();
       } else {
@@ -80,7 +80,7 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
   }
 
   Future<void> _initAutoConnection() async {
-    final unit = api.selectedUnitId.isEmpty ? 'RD5100' : api.selectedUnitId;
+    final unit = api.selectedUnitId.isEmpty ? 'DT5107' : api.selectedUnitId;
     if (isAutoPairing) return;
     isAutoPairing = true;
     try {
@@ -102,11 +102,53 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
       }
     } catch (_) {
       if (mounted) {
-        setState(() => status = 'Menghubungkan ulang...');
+        setState(() {
+          serviceEnabled = false;
+          status = 'Server FMS belum terjangkau';
+        });
       }
     } finally {
       isAutoPairing = false;
     }
+  }
+
+  Future<void> refresh() async {
+    final unit = boundUnit ?? api.selectedUnitId;
+    final key = unitKey;
+    if (unit.isEmpty || key == null || key.isEmpty) return;
+
+    try {
+      final response = await http
+          .get(
+            endpoint('messages', {'unit_name': unit}),
+            headers: {
+              'X-FMS-Unit-Key': key,
+              'Content-Type': 'application/json',
+            },
+          )
+          .timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200 && mounted) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['data'] is List) {
+          final List list = decoded['data'];
+          final parsed = list
+              .map((item) => Map<String, dynamic>.from(item as Map))
+              .toList();
+
+          final prevCount = messages.length;
+          setState(() {
+            messages = parsed;
+            serviceEnabled = true;
+            status = 'Radio & Pesan Terhubung';
+          });
+
+          if (parsed.length > prevCount) {
+            _scrollToBottom();
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   void _scrollToBottom() {
@@ -114,57 +156,33 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
       if (scrollController.hasClients) {
         scrollController.animateTo(
           scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
+          duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
       }
     });
   }
 
-  Future<void> refresh() async {
-    final key = unitKey ?? await api.ensureCabinCommsPairing(boundUnit);
-    final unit = boundUnit ?? (api.selectedUnitId.isEmpty ? 'RD5100' : api.selectedUnitId);
-    if (!mounted || key == null || unit.isEmpty) return;
-
-    try {
-      final response = await http
-          .get(
-            endpoint('messages', {'unit_name': unit}),
-            headers: {'X-FMS-Unit-Key': key},
-          )
-          .timeout(const Duration(seconds: 6));
-      if (!mounted) return;
-      if (response.statusCode == 200) {
-        final newMsgs = (jsonDecode(response.body)['data'] as List)
-            .map((item) => Map<String, dynamic>.from(item as Map))
-            .toList();
-        final hadMore = newMsgs.length > messages.length;
-        setState(() {
-          messages = newMsgs;
-          serviceEnabled = true;
-          status = 'Terhubung ke Ruang Kontrol';
-        });
-        if (hadMore) _scrollToBottom();
-      }
-    } catch (_) {}
-  }
-
   Future<void> send([String? textOverride]) async {
-    String? key = unitKey;
-    final unit = boundUnit ?? (api.selectedUnitId.isEmpty ? 'RD5100' : api.selectedUnitId);
     final body = (textOverride ?? messageInput.text).trim();
     if (body.isEmpty || busy) return;
 
+    final unit = boundUnit ?? api.selectedUnitId;
+    final key = unitKey;
+
+    if (unit.isEmpty || key == null || key.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Kanal kabin belum terhubung ke server FMS.'),
+          backgroundColor: FmsTheme.amberWarning,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     setState(() => busy = true);
     try {
-      if (key == null || key.isEmpty) {
-        key = await api.ensureCabinCommsPairing(unit);
-        if (key != null) unitKey = key;
-      }
-      if (key == null || key.isEmpty) {
-        throw Exception('Belum terhubung ke server FMS');
-      }
-
       final response = await http
           .post(
             endpoint('messages'),
@@ -205,7 +223,7 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
 
   @override
   Widget build(BuildContext context) {
-    final activeUnit = api.selectedUnitId.isEmpty ? 'RD5100' : api.selectedUnitId;
+    final activeUnit = api.selectedUnitId.isEmpty ? 'DT5107' : api.selectedUnitId;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     if (isLandscape) {
@@ -228,19 +246,12 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header Status Banner
               _buildHeaderStatusBanner(activeUnit),
               const SizedBox(height: 6),
-
-              // Chat Message List
               Expanded(child: _buildMessagesList()),
               const SizedBox(height: 6),
-
-              // Quick Preset Buttons Bar
               _buildQuickPresetsBar(),
               const SizedBox(height: 6),
-
-              // Text Field Input Bar
               _buildTextInputBar(),
             ],
           ),
@@ -313,7 +324,7 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'KANAL KABIN: $activeUnit  •  ${isOnline ? "TERHUBUNG LIVE" : status}',
+              'KANAL KABIN: $activeUnit  •  ${isOnline ? "TERHUBUNG DUA ARAH" : status}',
               style: FmsTheme.caption.copyWith(
                 color: isOnline ? FmsTheme.emeraldGreen : FmsTheme.amberWarning,
                 fontWeight: FontWeight.bold,
@@ -329,9 +340,9 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
               refresh();
             },
             borderRadius: BorderRadius.circular(4),
-            child: Padding(
-              padding: const EdgeInsets.all(3),
-              child: const Icon(Icons.refresh, size: 16, color: FmsTheme.cyanAccent),
+            child: const Padding(
+              padding: EdgeInsets.all(3),
+              child: Icon(Icons.refresh, size: 16, color: FmsTheme.cyanAccent),
             ),
           ),
         ],
@@ -380,43 +391,35 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
       ),
       child: ListView.builder(
         controller: scrollController,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         itemCount: messages.length,
         itemBuilder: (context, index) {
           final item = messages[index];
           final fromDispatch = item['sender_role'] == 'dispatcher';
-          final voice = item['kind'] == 'voice';
-          final priority = item['priority']?.toString();
-          final isUrgent = priority == 'urgent';
+          final isUrgent = item['priority'] == 'urgent';
+
+          final align = fromDispatch ? Alignment.centerLeft : Alignment.centerRight;
+          final Color bubbleBg = fromDispatch
+              ? (isUrgent ? const Color(0x33FF2A55) : const Color(0xFF0D253A))
+              : const Color(0xFF073024);
+
+          final Color borderClr = fromDispatch
+              ? (isUrgent ? FmsTheme.redHazard : FmsTheme.cyanAccent)
+              : FmsTheme.emeraldGreen;
 
           return Align(
-            alignment: fromDispatch ? Alignment.centerLeft : Alignment.centerRight,
+            alignment: align,
             child: Container(
-              constraints: const BoxConstraints(maxWidth: 420),
               margin: const EdgeInsets.only(bottom: 6),
-              padding: const EdgeInsets.all(8),
+              constraints: const BoxConstraints(maxWidth: 380),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               decoration: BoxDecoration(
-                color: fromDispatch
-                    ? const Color(0xF2082236)
-                    : const Color(0xF2062C20),
-                border: Border.all(
-                  color: isUrgent
-                      ? FmsTheme.redHazard
-                      : fromDispatch
-                          ? FmsTheme.cyanAccent.withValues(alpha: 0.7)
-                          : FmsTheme.emeraldGreen.withValues(alpha: 0.7),
-                  width: isUrgent ? 1.8 : 1.0,
-                ),
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(8),
-                  topRight: const Radius.circular(8),
-                  bottomLeft: Radius.circular(fromDispatch ? 2 : 8),
-                  bottomRight: Radius.circular(fromDispatch ? 8 : 2),
-                ),
+                color: bubbleBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: borderClr.withValues(alpha: 0.7), width: 1.0),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     mainAxisSize: MainAxisSize.min,
@@ -424,55 +427,30 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
                       Icon(
                         fromDispatch ? Icons.headset_mic_rounded : Icons.local_shipping_rounded,
                         size: 13,
-                        color: fromDispatch ? FmsTheme.cyanAccent : FmsTheme.emeraldGreen,
+                        color: borderClr,
                       ),
                       const SizedBox(width: 5),
                       Text(
-                        fromDispatch ? 'RUANG KONTROL' : 'KABIN SAYA',
+                        fromDispatch ? 'RUANG KONTROL (DISPATCH)' : 'OPERATOR KABIN',
                         style: TextStyle(
-                          color: fromDispatch ? FmsTheme.cyanAccent : FmsTheme.emeraldGreen,
+                          color: borderClr,
+                          fontSize: 9.0,
                           fontWeight: FontWeight.w800,
-                          fontSize: 9.5,
+                          letterSpacing: 0.5,
                         ),
                       ),
-                      if (isUrgent) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: FmsTheme.redHazard,
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                          child: const Text(
-                            'URGENT',
-                            style: TextStyle(color: Colors.white, fontSize: 7.5, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                   const SizedBox(height: 3),
-                  voice
-                      ? Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.volume_up, size: 15, color: FmsTheme.cyanAccent),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Transmisi Suara PTT',
-                              style: FmsTheme.bodyNormal.copyWith(fontSize: 11.5),
-                            ),
-                          ],
-                        )
-                      : Text(
-                          item['body']?.toString() ?? '',
-                          style: const TextStyle(
-                            fontSize: 12.0,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                            height: 1.25,
-                          ),
-                        ),
+                  Text(
+                    item['body'] ?? '',
+                    style: const TextStyle(
+                      color: Color(0xFFF0F6FC),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                      height: 1.25,
+                    ),
+                  ),
                   const SizedBox(height: 2),
                   Align(
                     alignment: Alignment.bottomRight,
@@ -536,15 +514,18 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
       children: [
         Expanded(
           child: SizedBox(
-            height: 38,
+            height: 42,
             child: TextField(
               controller: messageInput,
               maxLength: 500,
+              enableSuggestions: true,
+              autocorrect: false,
+              textInputAction: TextInputAction.send,
               onSubmitted: (_) => send(),
               style: FmsTheme.bodyNormal.copyWith(fontSize: 12),
               decoration: InputDecoration(
-                hintText: 'Ketik pesan manual ke kontrol...',
-                hintStyle: FmsTheme.caption.copyWith(fontSize: 10.5),
+                hintText: 'Ketik pesan ke ruang kontrol...',
+                hintStyle: FmsTheme.caption.copyWith(fontSize: 11),
                 counterText: '',
                 filled: true,
                 fillColor: const Color(0xFF08192C),
@@ -558,33 +539,32 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: FmsTheme.cyanAccent),
+                  borderSide: const BorderSide(color: FmsTheme.cyanAccent, width: 1.5),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               ),
             ),
           ),
         ),
-        const SizedBox(width: 5),
+        const SizedBox(width: 6),
         SizedBox(
-          width: 38,
-          height: 38,
-          child: IconButton.filled(
-            
+          width: 42,
+          height: 42,
+          child: ElevatedButton(
             onPressed: busy ? null : () => send(),
-            style: IconButton.styleFrom(
+            style: ElevatedButton.styleFrom(
               backgroundColor: FmsTheme.cyanAccent,
               foregroundColor: FmsTheme.bgDark,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               padding: EdgeInsets.zero,
             ),
-            icon: busy
+            child: busy
                 ? const SizedBox(
-                    width: 14,
-                    height: 14,
+                    width: 16,
+                    height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2, color: FmsTheme.bgDark),
                   )
-                : const Icon(Icons.send_rounded, size: 17),
+                : const Icon(Icons.send_rounded, size: 19),
           ),
         ),
       ],
@@ -610,9 +590,7 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
             color: FmsTheme.cardBg,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isLive || isReceiving
-                  ? themeColor
-                  : FmsTheme.cardBorder,
+              color: isLive || isReceiving ? themeColor : FmsTheme.cardBorder,
               width: isLive || isReceiving ? 1.5 : 1.0,
             ),
             boxShadow: isLive || isReceiving
@@ -628,7 +606,6 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header Radio Station
               Row(
                 children: [
                   Icon(Icons.radio_rounded, size: 16, color: themeColor),
@@ -697,7 +674,6 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
               ),
               const SizedBox(height: 8),
 
-              // PTT Label Description
               Text(
                 isLive
                     ? '● TRANSMISI SUARA AKTIF\n(LEPAS UNTUK SELESAI)'
@@ -714,7 +690,6 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
               ),
               const Spacer(),
 
-              // Bottom status bar
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 decoration: BoxDecoration(
