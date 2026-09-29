@@ -3,11 +3,13 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../models/cabin_bearing.dart';
+import '../models/fleet_models.dart';
 import '../services/fms_api_service.dart';
 
 class GpsTrackPainter extends CustomPainter {
   final List<CabinGpsPoint> track;
   final List<NearbyVehicle> nearbyVehicles;
+  final List<RoadSegment> roadSegments;
   final double easting, northing, heading, targetEasting, targetNorthing;
   final String targetName;
   final bool held;
@@ -15,6 +17,7 @@ class GpsTrackPainter extends CustomPainter {
   const GpsTrackPainter({
     required this.track,
     this.nearbyVehicles = const [],
+    this.roadSegments = const [],
     required this.easting,
     required this.northing,
     required this.heading,
@@ -57,6 +60,83 @@ class GpsTrackPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
     }
 
+    // --- 1. RENDER HAUL ROAD NETWORK (Nearby Haul Roads) ---
+    if (roadSegments.isNotEmpty) {
+      const maxRoadDist = 750.0;
+      final nearbyRoads = roadSegments.where((seg) {
+        final dStartE = (seg.startEasting - easting).abs();
+        final dStartN = (seg.startNorthing - northing).abs();
+        final dEndE = (seg.endEasting - easting).abs();
+        final dEndN = (seg.endNorthing - northing).abs();
+        return (dStartE < maxRoadDist && dStartN < maxRoadDist) ||
+            (dEndE < maxRoadDist && dEndN < maxRoadDist);
+      }).toList();
+
+      for (final seg in nearbyRoads) {
+        final p1 = project(seg.startEasting, seg.startNorthing);
+        final p2 = project(seg.endEasting, seg.endNorthing);
+
+        // Road width in screen pixels based on real mining road width
+        final roadPixelWidth = (seg.laneWidth * pixelsPerMeter).clamp(10.0, 36.0);
+
+        // A. Outer glowing shoulder
+        canvas.drawLine(
+          p1,
+          p2,
+          Paint()
+            ..color = const Color(0xFF0F3E4C).withValues(alpha: 0.55)
+            ..strokeWidth = roadPixelWidth + 5.0
+            ..strokeCap = StrokeCap.round,
+        );
+
+        // B. Dark Asphalt / Haul Road Surface
+        canvas.drawLine(
+          p1,
+          p2,
+          Paint()
+            ..color = const Color(0xFF0D252E)
+            ..strokeWidth = roadPixelWidth
+            ..strokeCap = StrokeCap.round,
+        );
+
+        // C. Road Edge Guideline
+        canvas.drawLine(
+          p1,
+          p2,
+          Paint()
+            ..color = const Color(0xFF1E5B6E).withValues(alpha: 0.70)
+            ..strokeWidth = roadPixelWidth
+            ..strokeCap = StrokeCap.round
+            ..style = PaintingStyle.stroke,
+        );
+
+        // D. Dashed Center Guideline (Cyber Cyan / Emerald)
+        final roadVec = p2 - p1;
+        final roadDist = roadVec.distance;
+        if (roadDist > 6.0) {
+          final dir = roadVec / roadDist;
+          final dashPaint = Paint()
+            ..color = const Color(0xFF00E5FF).withValues(alpha: 0.45)
+            ..strokeWidth = 1.6
+            ..strokeCap = StrokeCap.round;
+          const dashLen = 7.0;
+          const gapLen = 5.0;
+          for (double d = 0; d < roadDist; d += (dashLen + gapLen)) {
+            final startPt = p1 + dir * d;
+            final endPt = p1 + dir * math.min(d + dashLen, roadDist);
+            canvas.drawLine(startPt, endPt, dashPaint);
+          }
+        }
+
+        // E. Junction Node Points
+        final nodePaint = Paint()
+          ..color = const Color(0xFF00E5FF).withValues(alpha: 0.35);
+        canvas.drawCircle(p1, 2.2, nodePaint);
+        canvas.drawCircle(p2, 2.2, nodePaint);
+      }
+    }
+
+    // --- 2. RENDER GPS TRACK / BREADCRUMBS ---
     final pathPaint = Paint()
       ..color = held ? const Color(0xFFB89254) : const Color(0xFF40CBBB)
       ..strokeWidth = 3.5
@@ -86,6 +166,7 @@ class GpsTrackPainter extends CustomPainter {
       );
     }
 
+    // --- 3. TARGET GUIDELINE & BADGE ---
     final target = project(targetEasting, targetNorthing);
     final safe = Rect.fromLTRB(22, 22, size.width - 22, size.height - 22);
     final dx = target.dx - origin.dx, dy = target.dy - origin.dy;
@@ -177,6 +258,7 @@ class GpsTrackPainter extends CustomPainter {
     );
     canvas.drawCircle(marker, 2.5, Paint()..color = guidePaint.color);
 
+    // --- 4. NEARBY VEHICLES RADAR MARKERS ---
     if (!held) {
       final labels = <Rect>[];
       final visible = Rect.fromLTRB(16, 36, size.width - 16, size.height - 36);
@@ -207,7 +289,7 @@ class GpsTrackPainter extends CustomPainter {
 
         final label = TextPainter(
           text: TextSpan(
-            text: '${unit.unitName}  ${unit.distanceMeters.round()} m',
+            text: '   m',
             style: const TextStyle(
               color: Color(0xFFE5F2F3),
               fontSize: 10,
@@ -247,6 +329,7 @@ class GpsTrackPainter extends CustomPainter {
       }
     }
 
+    // --- 5. CURRENT VEHICLE AVATAR ---
     final unitColor = held ? const Color(0xFFD7A85C) : const Color(0xFF45E1B3);
     canvas.drawCircle(
       origin,
@@ -286,6 +369,7 @@ class GpsTrackPainter extends CustomPainter {
       }
     }
 
+    // --- 6. SCALE BAR (50m) ---
     final bar = Paint()
       ..color = const Color(0xFF9DC1C5)
       ..strokeWidth = 2;
@@ -320,6 +404,7 @@ class GpsTrackPainter extends CustomPainter {
   bool shouldRepaint(covariant GpsTrackPainter oldDelegate) =>
       oldDelegate.track != track ||
       oldDelegate.nearbyVehicles != nearbyVehicles ||
+      oldDelegate.roadSegments != roadSegments ||
       oldDelegate.easting != easting ||
       oldDelegate.northing != northing ||
       oldDelegate.heading != heading ||

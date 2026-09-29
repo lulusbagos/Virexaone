@@ -210,3 +210,44 @@ class MiningLocation {
     );
   }
 }
+
+class RoadSegment {
+  final int roadId;
+  final double distanceMeters;
+  final double startEasting;
+  final double startNorthing;
+  final double startElevation;
+  final double endEasting;
+  final double endNorthing;
+  final double endElevation;
+  final double laneWidth;
+
+  RoadSegment({
+    required this.roadId,
+    required this.distanceMeters,
+    required this.startEasting,
+    required this.startNorthing,
+    required this.startElevation,
+    required this.endEasting,
+    required this.endNorthing,
+    required this.endElevation,
+    this.laneWidth = 16.0,
+  });
+
+  factory RoadSegment.fromJson(Map<String, dynamic> json) {
+    final start = json['start_location'] as Map<String, dynamic>? ?? {};
+    final end = json['end_location'] as Map<String, dynamic>? ?? {};
+    final rawWidth = (json['lane_width'] as num?)?.toDouble();
+    return RoadSegment(
+      roadId: (json['road_id'] as num?)?.toInt() ?? 0,
+      distanceMeters: (json['distance_m'] as num?)?.toDouble() ?? 0.0,
+      startEasting: (start['easting'] as num?)?.toDouble() ?? 0.0,
+      startNorthing: (start['northing'] as num?)?.toDouble() ?? 0.0,
+      startElevation: (start['elevation'] as num?)?.toDouble() ?? 0.0,
+      endEasting: (end['easting'] as num?)?.toDouble() ?? 0.0,
+      endNorthing: (end['northing'] as num?)?.toDouble() ?? 0.0,
+      endElevation: (end['elevation'] as num?)?.toDouble() ?? 0.0,
+      laneWidth: (rawWidth != null && rawWidth > 4.0) ? rawWidth : 16.0,
+    );
+  }
+}

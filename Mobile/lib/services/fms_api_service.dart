@@ -96,6 +96,7 @@ class FmsApiService extends ChangeNotifier {
   List<FleetUnit> allUnits = [], excavatorUnits = [], haulerUnits = [];
   List<DispatchPair> activeDispatches = [];
   List<MiningLocation> miningLocations = [];
+  List<RoadSegment> roadSegments = [];
   Map<String, dynamic>? hexagonUnitData;
   String hexagonDataStatus = 'Memuat data Hexagon...';
   List<NearbyVehicle> nearbyVehicles = [];
@@ -300,6 +301,13 @@ class FmsApiService extends ChangeNotifier {
       } catch (_) {
         miningLocations = [];
       }
+      try {
+        final roadsResp = await _get('/api/v1/roads/network');
+        if (roadsResp['status'] == 'success') {
+          roadSegments = _rows(roadsResp['data']).map(RoadSegment.fromJson).toList();
+        }
+      } catch (_) {}
+
       if (selectedUnitId.isNotEmpty) {
         try {
           final detail = await _get(

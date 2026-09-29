@@ -791,6 +791,7 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
                                 )
                               : GpsTrackPainter(
                                   track: _api.gpsTrack,
+                                  roadSegments: _api.roadSegments,
                                   nearbyVehicles: _api.nearbyVehicles,
                                   easting: _api.hdEasting,
                                   northing: _api.hdNorthing,
