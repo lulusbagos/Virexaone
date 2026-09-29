@@ -335,6 +335,7 @@ class FmsApiService extends ChangeNotifier {
       _updateLiveNavigationMetrics();
       _refreshNavigationDisplay();
       _updateProximityRadar();
+      ensureCabinCommsPairing();
       final unit = selectedUnit;
       if (unit != null && unit.hasFreshGps) _refreshWeather(unit);
     } catch (e) {
@@ -738,7 +739,7 @@ class FmsApiService extends ChangeNotifier {
     try {
       final response = await http
           .post(
-            Uri.parse('/api/v1/comms/pair'),
+            Uri.parse('$backendBaseUrl/api/v1/comms/pair'),
             headers: {
               'X-FMS-Dispatcher-Key': _localDispatcherKey,
               'Content-Type': 'application/json',

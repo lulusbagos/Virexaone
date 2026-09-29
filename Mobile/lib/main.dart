@@ -10,9 +10,8 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Support both portrait and landscape modes dynamically
+  // Lock default orientation to Landscape for mining in-cabin cockpit mounts
   SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
     DeviceOrientation.landscapeLeft,
     DeviceOrientation.landscapeRight,
   ]);
