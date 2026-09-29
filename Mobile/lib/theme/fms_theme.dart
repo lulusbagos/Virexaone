@@ -3,11 +3,12 @@ import 'package:google_fonts/google_fonts.dart';
 
 class FmsTheme {
   // Background & Surface Colors (Deep Cyber Obsidian & Glassmorphism)
-  static const Color bgDark = Color(0xFF040812);
-  static const Color surfaceDark = Color(0xFF071220);
-  static const Color cardBg = Color(0xF20A1A30);
-  static const Color cardHeaderBg = Color(0xF805101E);
+  static const Color bgDark = Color(0xFF030712);
+  static const Color surfaceDark = Color(0xFF060E1E);
+  static const Color cardBg = Color(0xF208162A);
+  static const Color cardHeaderBg = Color(0xF8040D18);
   static const Color cardBorder = Color(0x5500E5FF);
+  static const Color cardBorderActive = Color(0xAA00FFA3);
 
   // Luminous Accent Colors
   static const Color cyanAccent = Color(0xFF00E5FF);
@@ -18,12 +19,25 @@ class FmsTheme {
   static const Color textMuted = Color(0xFF7E9BB8);
   static const Color textLight = Color(0xFFE2EDF8);
 
+  // Gradients for cockpit surfaces
+  static const LinearGradient cyberCardGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xF00D1F38), Color(0xF0050E1A)],
+  );
+
+  static const LinearGradient activeTargetGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0xEE0A241B), Color(0xEE04120D)],
+  );
+
   // Glow shadows for futuristic cards
-  static List<BoxShadow> neonGlowShadow(Color glowColor, {double opacity = 0.25}) {
+  static List<BoxShadow> neonGlowShadow(Color glowColor, {double opacity = 0.25, double blur = 12}) {
     return [
       BoxShadow(
         color: glowColor.withValues(alpha: opacity),
-        blurRadius: 12,
+        blurRadius: blur,
         spreadRadius: 1,
         offset: const Offset(0, 2),
       ),
