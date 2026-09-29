@@ -1275,8 +1275,8 @@ namespace Virexa.FMS
                 cursorUtmInfo = $"E: {lastEasting:F1} m | N: {lastNorthing:F1} m | Elev: {lastElevation:F1} m";
             }
 
-            // Keyboard Shortcuts (disabled if modal textfield is active)
-            if (!IsBlockingModalOpen())
+            // Keyboard Shortcuts (disabled if modal or textfield is active)
+            if (!IsBlockingModalOpen() && GUIUtility.keyboardControl == 0)
             {
                 // [U] Toggle Fleet Units
                 if (Input.GetKeyDown(KeyCode.U))
@@ -6132,7 +6132,7 @@ namespace Virexa.FMS
             {
                 GUI.Box(new Rect(x + 20, curY, modalW - 40, 52), GUIContent.none, dropdownPanelStyle);
                 GUI.Label(new Rect(x + 28, curY + 6, 80, 20), "🔍 Cari Unit:", hintStyle);
-                dispatchUnitSearchQuery = GUI.TextField(new Rect(x + 105, curY + 4, 130, 22), dispatchUnitSearchQuery, GUI.skin.textField);
+                dispatchUnitSearchQuery = GUI.TextField(new Rect(x + 105, curY + 4, 130, 22), dispatchUnitSearchQuery ?? "", searchBoxStyle ?? GUI.skin.textField);
 
                 var fleet = FMSFleetManager.Instance != null ? FMSFleetManager.Instance.activeFleet : null;
                 List<FMSUnitController> filteredUnits = new List<FMSUnitController>();
@@ -6259,7 +6259,7 @@ namespace Virexa.FMS
                 float textInputW = modalW - 40 - pttBtnW - sendBtnW - 16;
 
                 GUI.Box(new Rect(x + 20, curY, textInputW, 36), GUIContent.none, dropdownPanelStyle);
-                dispatchOutgoingMessage = GUI.TextField(new Rect(x + 26, curY + 6, textInputW - 12, 24), dispatchOutgoingMessage, GUI.skin.textField);
+                dispatchOutgoingMessage = GUI.TextField(new Rect(x + 26, curY + 6, textInputW - 12, 24), dispatchOutgoingMessage ?? "", searchBoxStyle ?? GUI.skin.textField);
 
                 // Handle keyboard Enter to send
                 Event curEvent = Event.current;
