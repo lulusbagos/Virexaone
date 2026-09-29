@@ -238,7 +238,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         ? const Color(0xFF18312F)
                         : Colors.transparent,
                     child: InkWell(
-                      onTap: () => setState(() => selectedName = unit.unitName),
+                      onTap: () {
+                          if (selectedName == unit.unitName) {
+                            if (api.login('', '', unit.unitName)) {
+                              widget.onLoginSuccess();
+                            }
+                          } else {
+                            setState(() => selectedName = unit.unitName);
+                          }
+                        },
                       child: Container(
                         height: 54,
                         padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -469,16 +477,20 @@ class _LoginScreenState extends State<LoginScreen> {
       SizedBox(
         height: 42,
         child: FilledButton.icon(
-          onPressed:
-              selected != null && selected.hasFreshGps && api.isApiConnected
+          onPressed: selected != null
               ? () {
                   if (api.login('', '', selected.unitName)) {
                     widget.onLoginSuccess();
                   }
                 }
               : null,
+          style: FilledButton.styleFrom(
+            backgroundColor: selected != null ? FmsTheme.emeraldGreen : null,
+            foregroundColor: FmsTheme.bgDark,
+            textStyle: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5),
+          ),
           icon: const Icon(Icons.arrow_forward, size: 18),
-          label: const Text('Buka kabin'),
+          label: const Text('BUKA KABIN'),
         ),
       ),
     ],

@@ -705,13 +705,12 @@ class FmsApiService extends ChangeNotifier {
   }
 
   bool login(String nik, String name, String unitId) {
-    if (!isApiConnected ||
-        !haulerUnits.any((u) => u.unitName == unitId && u.hasFreshGps)) {
-      return false;
-    }
-    ensureCabinCommsPairing(unitId);
-    if (selectedUnitId != unitId) _resetNavigationCache();
-    selectedUnitId = unitId;
+    final cleanId = unitId.trim();
+    if (cleanId.isEmpty) return false;
+
+    ensureCabinCommsPairing(cleanId);
+    if (selectedUnitId != cleanId) _resetNavigationCache();
+    selectedUnitId = cleanId;
     hexagonUnitData = null;
     hexagonDataStatus = 'Memuat data Hexagon...';
     _lastWeatherFetch = null;
