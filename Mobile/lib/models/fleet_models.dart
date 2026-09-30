@@ -35,18 +35,46 @@ class FleetUnit {
   final double? payloadTon;
   final int? recordedLoads;
   final String? assignedShovelName;
+  final double? vesselCapacityTon;
+  final double? payloadUtilizationPct;
+  final double? haulDistanceM;
+  final int? cycleExpectedSec;
+  final String? dumpLocationName;
+  final String? materialCode;
+  final double? odometerKm;
+  final double? fuelLevelLiters;
+  final double? fuelLevelPct;
+  final bool? prestartPassed;
+  final List<TrajectoryPoint> recentTrajectory;
 
   bool get hasGpsPosition =>
+      latitude != null &&
+      longitude != null &&
       easting.isFinite &&
       northing.isFinite &&
       easting > 0 &&
       northing > 0;
-  bool get hasFreshGps => hasGpsPosition;
+
+  bool get hasFreshGps =>
+      hasGpsPosition &&
+      (isActive || lastHeardSecondsAgo <= 180);
+
   bool get hasNavigationHeading =>
       hasFreshGps &&
+      headingAvailable &&
       headingDeg.isFinite &&
       headingDeg >= 0 &&
       headingDeg <= 360;
+
+  String get formattedGpsAge {
+    if (!hasGpsPosition) return 'TIDAK TERSEDIA';
+    final age = lastHeardSecondsAgo;
+    if (age <= 0) return '0s';
+    if (age < 60) return '${age}s';
+    if (age < 3600) return '${age ~/ 60}m';
+    if (age < 86400) return '${age ~/ 3600}j';
+    return '${age ~/ 86400}h';
+  }
 
   FleetUnit({
     required this.unitId,
@@ -74,27 +102,41 @@ class FleetUnit {
     this.payloadTon,
     this.recordedLoads,
     this.assignedShovelName,
+    this.vesselCapacityTon,
+    this.payloadUtilizationPct,
+    this.haulDistanceM,
+    this.cycleExpectedSec,
+    this.dumpLocationName,
+    this.materialCode,
+    this.odometerKm,
+    this.fuelLevelLiters,
+    this.fuelLevelPct,
+    this.prestartPassed,
+    this.recentTrajectory = const [],
   });
 
   factory FleetUnit.fromJson(Map<String, dynamic> json) {
     final heading = (json['heading_deg'] as num?)?.toDouble();
     bool headingFromSource = json['heading_available'] == true;
+    final trajectoryRaw = json['recent_trajectory'];
+    final parsedTrajectory = <TrajectoryPoint>[];
+    if (trajectoryRaw is List) {
+      for (final item in trajectoryRaw) {
+        if (item is Map<String, dynamic>) {
+          parsedTrajectory.add(TrajectoryPoint.fromJson(item));
+        } else if (item is Map) {
+          parsedTrajectory.add(TrajectoryPoint.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+    }
+
     if (!json.containsKey('heading_available') && heading != null) {
       final heard = DateTime.tryParse(json['last_heard']?.toString() ?? '');
-      final trajectory = json['recent_trajectory'];
-      if (heard != null && trajectory is List && trajectory.isNotEmpty) {
-        final sample = trajectory.last;
-        if (sample is Map) {
-          final recorded = DateTime.tryParse(
-            sample['recorded_at']?.toString() ?? '',
-          );
-          final sampleHeading = (sample['heading_deg'] as num?)?.toDouble();
-          headingFromSource =
-              recorded != null &&
-              sampleHeading != null &&
-              (recorded.difference(heard).inSeconds).abs() <= 5 &&
-              (sampleHeading - heading).abs() <= 0.5;
-        }
+      if (heard != null && parsedTrajectory.isNotEmpty) {
+        final sample = parsedTrajectory.last;
+        headingFromSource =
+            (sample.recordedAt.difference(heard).inSeconds).abs() <= 5 &&
+            (sample.headingDeg - heading).abs() <= 0.5;
       }
     }
     return FleetUnit(
@@ -128,6 +170,54 @@ class FleetUnit {
           ? (json['recorded_loads'] as num?)?.toInt()
           : null,
       assignedShovelName: json['assigned_shovel_name']?.toString(),
+      vesselCapacityTon: (json['vessel_capacity_ton'] as num?)?.toDouble(),
+      payloadUtilizationPct: (json['payload_utilization_pct'] as num?)?.toDouble(),
+      haulDistanceM: (json['haul_distance_m'] as num?)?.toDouble(),
+      cycleExpectedSec: (json['cycle_expected_sec'] as num?)?.toInt(),
+      dumpLocationName: json['dump_location_name']?.toString(),
+      materialCode: json['material_code']?.toString(),
+      odometerKm: (json['odometer_km'] as num?)?.toDouble(),
+      fuelLevelLiters: (json['fuel_level_liters'] as num?)?.toDouble(),
+      fuelLevelPct: (json['fuel_level_pct'] as num?)?.toDouble(),
+      prestartPassed: json['prestart_passed'] as bool?,
+      recentTrajectory: parsedTrajectory,
+    );
+  }
+}
+
+class TrajectoryPoint {
+  final double easting;
+  final double northing;
+  final double elevation;
+  final double headingDeg;
+  final double speedKmh;
+  final DateTime recordedAt;
+
+  const TrajectoryPoint({
+    required this.easting,
+    required this.northing,
+    required this.elevation,
+    required this.headingDeg,
+    required this.speedKmh,
+    required this.recordedAt,
+  });
+
+  factory TrajectoryPoint.fromJson(Map<String, dynamic> json) {
+    return TrajectoryPoint(
+      easting: (json['easting'] as num?)?.toDouble() ??
+          (json['x'] as num?)?.toDouble() ??
+          0.0,
+      northing: (json['northing'] as num?)?.toDouble() ??
+          (json['z'] as num?)?.toDouble() ??
+          0.0,
+      elevation: (json['elevation'] as num?)?.toDouble() ??
+          (json['y'] as num?)?.toDouble() ??
+          0.0,
+      headingDeg: (json['heading_deg'] as num?)?.toDouble() ?? 0.0,
+      speedKmh: (json['speed_kmh'] as num?)?.toDouble() ?? 0.0,
+      recordedAt: DateTime.tryParse(json['recorded_at']?.toString() ?? '')
+              ?.toUtc() ??
+          DateTime.now().toUtc(),
     );
   }
 }
@@ -142,13 +232,7 @@ class DispatchPair {
   final String locationName;
   final String? updatedAt;
 
-  bool get isRecent {
-    final time = DateTime.tryParse(updatedAt ?? '');
-    if (time == null) return false;
-    final age = DateTime.now().toUtc().difference(time.toUtc());
-    return age >= const Duration(minutes: -5) &&
-        age <= const Duration(hours: 12);
-  }
+  bool get isRecent => true; // Always allow active dispatch pairs for in-cabin navigation
 
   DispatchPair({
     required this.dispatchId,

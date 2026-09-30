@@ -438,24 +438,30 @@ namespace Virexa.FMS
                         loader.BuildRealGISTerrain();
                     }
                 }
+                t = Terrain.activeTerrain ?? FindFirstObjectByType<Terrain>();
             }
 
-            if (MineTerrainLoader.Instance == null)
+            // Clean up any duplicate legacy mesh terrain to prevent double GeoTIFF overlap (Z-fighting)
+            var oldMeshTerrain = GameObject.Find("3D_Mine_Terrain");
+            if (oldMeshTerrain != null && t != null && oldMeshTerrain != t.gameObject)
             {
-                var existingMine = FindFirstObjectByType<MineTerrainLoader>();
-                if (existingMine != null)
-                {
-                    existingMine.BuildTerrain();
-                }
-                else
-                {
-                    var terrainObj = GameObject.Find("RealMining_Terrain_GIS") ?? GameObject.Find("3D_Mine_Terrain");
-                    if (terrainObj != null)
-                    {
-                        var ml = terrainObj.GetComponent<MineTerrainLoader>() ?? terrainObj.AddComponent<MineTerrainLoader>();
-                        ml.BuildTerrain();
-                    }
-                }
+                Destroy(oldMeshTerrain);
+            }
+            var oldRootTerrain = GameObject.Find("--- FMS_MINE_TERRAIN ---");
+            if (oldRootTerrain != null && t != null && oldRootTerrain != t.gameObject)
+            {
+                Destroy(oldRootTerrain);
+            }
+
+            // Remove legacy MeshRenderer/Filter attached to Terrain object if any
+            if (t != null)
+            {
+                var ml = t.GetComponent<MineTerrainLoader>();
+                if (ml != null) Destroy(ml);
+                var mf = t.GetComponent<MeshFilter>();
+                if (mf != null) Destroy(mf);
+                var mr = t.GetComponent<MeshRenderer>();
+                if (mr != null) Destroy(mr);
             }
         }
 
@@ -6332,7 +6338,7 @@ namespace Virexa.FMS
             // =========================================================================
             if (dispatchModalTab == 0)
             {
-                float chatBoxH = modalH - (curY - y) - 95f;
+                float chatBoxH = modalH - (curY - y) - 140f;
                 var msgs = FMSFleetMessenger.Instance != null ? FMSFleetMessenger.Instance.messageHistory : new List<FMSFleetMessenger.ChatMessage>();
 
                 Rect scrollArea = new Rect(x + 20, curY, modalW - 40, chatBoxH);
@@ -6384,15 +6390,15 @@ namespace Virexa.FMS
                 }
 
                 GUI.EndScrollView();
-                curY += chatBoxH + 10;
+                curY += chatBoxH + 8;
 
-                // Priority Selector Chips + Outgoing Text Box + Send + PTT
+                // Priority Selector Chips + Target Indicator
                 float priW = 85f;
                 string[] priLabels = { "🟢 Normal", "🟡 Urgent", "🔴 Darurat" };
                 for (int p = 0; p < priLabels.Length; p++)
                 {
                     bool isPriSel = dispatchPriorityIndex == p;
-                    if (GUI.Button(new Rect(x + 20 + p * (priW + 4), curY, priW, 26), priLabels[p], isPriSel ? navBtnActiveStyle : navBtnStyle))
+                    if (GUI.Button(new Rect(x + 20 + p * (priW + 4), curY, priW, 24), priLabels[p], isPriSel ? navBtnActiveStyle : navBtnStyle))
                     {
                         dispatchPriorityIndex = p;
                     }
@@ -6404,12 +6410,54 @@ namespace Virexa.FMS
                                            (dispatchSelectedUnitTarget == "FLEET_EXCAVATOR" ? "SEMUA EXCAVATOR (EX)" :
                                            (dispatchSelectedUnitTarget == "FLEET_SUPPORT" ? "SEMUA SUPPORT UNIT" : $"UNIT {dispatchSelectedUnitTarget}")));
 
-                GUI.Label(new Rect(x + 300, curY + 4, modalW - 320, 20), $"Kirim ke: <color=#00FFA3><b>{targetDisplayName}</b></color>", hintStyle);
+                GUI.Label(new Rect(x + 300, curY + 2, modalW - 320, 20), $"Kirim ke: <color=#00FFA3><b>{targetDisplayName}</b></color>", hintStyle);
+                curY += 28;
+
+                // ⚡ 1-Click Quick Message Shortcuts Bar (Direct Dispatch Macros)
+                string[] quickShortcuts = new string[]
+                {
+                    "🚜 Siap Muat di Front",
+                    "📦 Arahkan ke Disposal A",
+                    "📦 Arahkan ke Disposal B",
+                    "🛑 Stop Operasi (Hujan)",
+                    "⛽ Fuel Truck Siap",
+                    "⚠️ Hati-hati Hazard Jalur",
+                    "🚨 Evakuasi Darurat"
+                };
+
+                string[] quickFullTexts = new string[]
+                {
+                    "Unit silakan segera merapat ke Front Gali untuk pemuatan material.",
+                    "Arahkan muatan material ke Disposal A (Sisi Barat).",
+                    "Arahkan muatan material ke Disposal B (Sisi Timur).",
+                    "Perhatian: Operasional hauling dihentikan sementara karena cuaca hujan / jalur licin.",
+                    "Fuel Truck standby di area parkir timur, unit yang memerlukan solar silakan merapat.",
+                    "Hati-hati: Ada blind spot / perbaikan jalan di segmen hauling utama.",
+                    "PERINGATAN DARURAT: Seluruh unit segera berhenti dan evakuasi ke titik kumpul aman!"
+                };
+
+                float scX = x + 20;
+                for (int sc = 0; sc < quickShortcuts.Length; sc++)
+                {
+                    float scW = 148f;
+                    if (scX + scW > x + modalW - 20) break; // stay within modal width
+
+                    if (GUI.Button(new Rect(scX, curY, scW, 24), quickShortcuts[sc], navBtnStyle))
+                    {
+                        dispatchOutgoingMessage = quickFullTexts[sc];
+                        var pri = sc == 6 ? FMSFleetMessenger.MessagePriority.Emergency :
+                                 (sc == 3 || sc == 5 ? FMSFleetMessenger.MessagePriority.Urgent : FMSFleetMessenger.MessagePriority.Normal);
+                        EnsureFleetMessenger();
+                        FMSFleetMessenger.Instance?.SendFromControlRoom(dispatchSelectedUnitTarget, quickFullTexts[sc], pri);
+                        ShowNotification($"📨 Pesan Cepat Terkirim ke {targetDisplayName}: \"{quickShortcuts[sc]}\"");
+                    }
+                    scX += scW + 4;
+                }
                 curY += 30;
 
                 // Message Text Field & Action Buttons
                 float pttBtnW = 200f;
-                float sendBtnW = 120f;
+                float sendBtnW = 110f;
                 float textInputW = modalW - 40 - pttBtnW - sendBtnW - 16;
                 Rect inputRect = new Rect(x + 20, curY, textInputW, 36);
 

@@ -58,50 +58,44 @@ class _FmsMenuScreenState extends State<FmsMenuScreen> {
       child: Material(
         color: FmsTheme.bgDark,
         borderRadius: BorderRadius.circular(10),
-        child: Overlay(
-          initialEntries: [
-            OverlayEntry(
-              builder: (overlayContext) => ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1100, maxHeight: 680),
-                child: ListenableBuilder(
-                  listenable: Listenable.merge([api, settings]),
-                  builder: (context, _) => Column(
-                    children: [
-                      _header(),
-                      Divider(height: 1, color: FmsTheme.cardBorder),
-                      Expanded(
-                        child: LayoutBuilder(
-                          builder: (context, size) => size.maxWidth < 650
-                              ? Column(
-                                  children: [
-                                    SizedBox(
-                                      height: 56,
-                                      child: _tabs(horizontal: true),
-                                    ),
-                                    Expanded(child: _content()),
-                                  ],
-                                )
-                              : Row(
-                                  children: [
-                                    SizedBox(
-                                      width: 200,
-                                      child: _tabs(horizontal: false),
-                                    ),
-                                    VerticalDivider(
-                                      width: 1,
-                                      color: FmsTheme.cardBorder,
-                                    ),
-                                    Expanded(child: _content()),
-                                  ],
-                                ),
-                        ),
-                      ),
-                    ],
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1100, maxHeight: 680),
+          child: ListenableBuilder(
+            listenable: Listenable.merge([api, settings]),
+            builder: (context, _) => Column(
+              children: [
+                _header(),
+                Divider(height: 1, color: FmsTheme.cardBorder),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, size) => size.maxWidth < 650
+                        ? Column(
+                            children: [
+                              SizedBox(
+                                height: 56,
+                                child: _tabs(horizontal: true),
+                              ),
+                              Expanded(child: _content()),
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              SizedBox(
+                                width: 200,
+                                child: _tabs(horizontal: false),
+                              ),
+                              VerticalDivider(
+                                width: 1,
+                                color: FmsTheme.cardBorder,
+                              ),
+                              Expanded(child: _content()),
+                            ],
+                          ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

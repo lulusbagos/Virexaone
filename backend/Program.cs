@@ -448,13 +448,14 @@ api.MapGet("/production/summary", async (FmsDataService fms) =>
     return Results.Ok(new { status = prod.DataAvailable ? "success" : "degraded", data = prod });
 });
 
-api.MapGet("/weather/current", async (double latitude, double longitude, OpenMeteoWeatherService weather) =>
+api.MapGet("/weather/current", async (double? latitude, double? longitude, OpenMeteoWeatherService weather) =>
 {
-    if (!double.IsFinite(latitude) || !double.IsFinite(longitude) ||
-        Math.Abs(latitude) > 90 || Math.Abs(longitude) > 180 ||
-        !GeoTransform.IsWithinSiteRadius(latitude, longitude, config.GetValue("WeatherRadiusKm", 30.0)))
+    if (!latitude.HasValue || !longitude.HasValue ||
+        !double.IsFinite(latitude.Value) || !double.IsFinite(longitude.Value) ||
+        Math.Abs(latitude.Value) > 90 || Math.Abs(longitude.Value) > 180 ||
+        !GeoTransform.IsWithinSiteRadius(latitude.Value, longitude.Value, config.GetValue("WeatherRadiusKm", 30.0)))
         return Results.BadRequest(new { status = "invalid_location", data = (WeatherReportDto?)null });
-    var report = await weather.GetCurrentAsync(latitude, longitude);
+    var report = await weather.GetCurrentAsync(latitude.Value, longitude.Value);
     return Results.Ok(new { status = report == null ? "unavailable" : "success", data = report });
 });
 

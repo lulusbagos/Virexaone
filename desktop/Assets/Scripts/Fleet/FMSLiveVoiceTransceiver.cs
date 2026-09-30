@@ -49,6 +49,7 @@ namespace Virexa.FMS
         // Thread-safe queues for cross-thread dispatching & low-latency audio DSP
         private readonly ConcurrentQueue<Action> mainThreadActions = new ConcurrentQueue<Action>();
         private readonly ConcurrentQueue<float> audioPlaybackQueue = new ConcurrentQueue<float>();
+        private int cachedOutputSampleRate = 48000;
 
         private void Awake()
         {
@@ -57,6 +58,15 @@ namespace Virexa.FMS
             {
                 Destroy(gameObject);
                 return;
+            }
+
+            try
+            {
+                cachedOutputSampleRate = AudioSettings.outputSampleRate > 0 ? AudioSettings.outputSampleRate : 48000;
+            }
+            catch
+            {
+                cachedOutputSampleRate = 48000;
             }
 
             audioSource = GetComponent<AudioSource>();
@@ -78,6 +88,11 @@ namespace Virexa.FMS
 
         private void Start()
         {
+            try
+            {
+                cachedOutputSampleRate = AudioSettings.outputSampleRate > 0 ? AudioSettings.outputSampleRate : 48000;
+            }
+            catch { }
             RefreshMicrophoneDevices();
             connectionLoopCoroutine = StartCoroutine(ConnectionLifecycleLoop());
         }
@@ -154,7 +169,7 @@ namespace Virexa.FMS
         private void OnAudioFilterRead(float[] data, int channels)
         {
             float vol = speakerVolume;
-            int outRate = AudioSettings.outputSampleRate > 0 ? AudioSettings.outputSampleRate : 48000;
+            int outRate = cachedOutputSampleRate > 0 ? cachedOutputSampleRate : 48000;
             float step = (float)SAMPLE_RATE / outRate;
 
             for (int i = 0; i < data.Length; i += channels)
@@ -458,8 +473,10 @@ namespace Virexa.FMS
                         currentReceivingRole = dto.sender_role;
 
                         FMSFleetMessenger.Instance?.StartCabinTalkback(dto.unit_name, $"Operator {dto.unit_name}");
+                        Mobile.OperatorAudioFeedbackManager.Instance?.PlayDispatchAlert();
                         if (FMSDashboardUI.Instance != null)
                         {
+                            FMSDashboardUI.Instance.ShowNotification($"🎙️ [RADIO KABIN MASUK] Operator Unit {dto.unit_name} sedang berbicara live...");
                             FMSDashboardUI.Instance.ShowCabinCommunicationPopup(dto.unit_name, $"Operator {dto.unit_name}", "Transmisi Suara PTT Kabin Aktif (16kHz Live)", true, false);
                         }
                     });
@@ -470,6 +487,10 @@ namespace Virexa.FMS
                     {
                         isReceivingVoice = false;
                         FMSFleetMessenger.Instance?.StopCabinTalkback();
+                        if (FMSDashboardUI.Instance != null)
+                        {
+                            FMSDashboardUI.Instance.ShowNotification($"🎙️ [RADIO KABIN SELESAI] Transmisi suara dari {currentReceivingUnit} selesai.");
+                        }
                     });
                 }
                 else if (dto.type == "ready")
@@ -507,10 +528,17 @@ namespace Virexa.FMS
 
         private async void SendBinaryData(byte[] data)
         {
-            if (webSocket == null || webSocket.State != WebSocketState.Open) return;
+            if (webSocket == null || webSocket.State != WebSocketState.Open || data == null || data.Length == 0) return;
             try
             {
-                await webSocket.SendAsync(new ArraySegment<byte>(data), WebSocketMessageType.Binary, true, CancellationToken.None);
+                int offset = 0;
+                const int maxChunk = 2048;
+                while (offset < data.Length)
+                {
+                    int count = Math.Min(maxChunk, data.Length - offset);
+                    await webSocket.SendAsync(new ArraySegment<byte>(data, offset, count), WebSocketMessageType.Binary, true, CancellationToken.None);
+                    offset += count;
+                }
             }
             catch { }
         }

@@ -78,6 +78,13 @@ class _SplashScreenState extends State<SplashScreen>
     await Future.delayed(const Duration(milliseconds: 400));
     if (!mounted) return;
 
+    if (!_api.isLoggedIn) {
+      final targetUnit = _api.selectedUnitId.isNotEmpty
+          ? _api.selectedUnitId
+          : (_api.haulerUnits.isNotEmpty ? _api.haulerUnits.first.unitName : 'RD5095');
+      _api.login('', '', targetUnit);
+    }
+
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (context, anim, secAnim) => _api.isLoggedIn

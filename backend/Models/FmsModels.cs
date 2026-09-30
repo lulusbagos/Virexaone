@@ -48,7 +48,17 @@ namespace Virexaone.FMS.Backend.Models
         [property: JsonPropertyName("haul_updated_at")] string? HaulUpdatedAt,
         [property: JsonPropertyName("last_heard")] string? LastHeard,
         [property: JsonPropertyName("last_heard_seconds_ago")] int LastHeardSecondsAgo,
-        [property: JsonPropertyName("heading_available")] bool HeadingAvailable
+        [property: JsonPropertyName("heading_available")] bool HeadingAvailable,
+        [property: JsonPropertyName("vessel_capacity_ton")] double? VesselCapacityTon,
+        [property: JsonPropertyName("payload_utilization_pct")] double? PayloadUtilizationPct,
+        [property: JsonPropertyName("haul_distance_m")] double? HaulDistanceM,
+        [property: JsonPropertyName("cycle_expected_sec")] int? CycleExpectedSec,
+        [property: JsonPropertyName("dump_location_name")] string? DumpLocationName,
+        [property: JsonPropertyName("material_code")] string? MaterialCode,
+        [property: JsonPropertyName("odometer_km")] double? OdometerKm,
+        [property: JsonPropertyName("fuel_level_liters")] double? FuelLevelLiters,
+        [property: JsonPropertyName("fuel_level_pct")] double? FuelLevelPct,
+        [property: JsonPropertyName("prestart_passed")] bool? PrestartPassed
     );
 
     public record FleetInventoryUnitDto(

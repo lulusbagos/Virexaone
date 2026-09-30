@@ -62,6 +62,18 @@ namespace Virexa.FMS
             SetupTerrainLayers();
 
             // 4. Create or Update Terrain Component
+            // Clean up any legacy duplicate mesh objects to prevent double GeoTIFF overlapping
+            GameObject oldTerrain = GameObject.Find("3D_Mine_Terrain");
+            if (oldTerrain != null && (activeTerrain == null || oldTerrain != activeTerrain.gameObject))
+            {
+                DestroyImmediate(oldTerrain);
+            }
+            GameObject oldMineRoot = GameObject.Find("--- FMS_MINE_TERRAIN ---");
+            if (oldMineRoot != null && (activeTerrain == null || oldMineRoot != activeTerrain.gameObject))
+            {
+                DestroyImmediate(oldMineRoot);
+            }
+
             if (activeTerrain == null)
             {
                 Terrain[] existing = FindObjectsByType<Terrain>(FindObjectsSortMode.None);
@@ -80,6 +92,17 @@ namespace Virexa.FMS
                     tObj.name = "RealMining_Terrain_GIS";
                     activeTerrain = tObj.GetComponent<Terrain>();
                 }
+            }
+
+            // Remove any legacy MeshFilter/MeshRenderer on the terrain GameObject
+            if (activeTerrain != null)
+            {
+                var ml = activeTerrain.GetComponent<MineTerrainLoader>();
+                if (ml != null) DestroyImmediate(ml);
+                var mf = activeTerrain.GetComponent<MeshFilter>();
+                if (mf != null) DestroyImmediate(mf);
+                var mr = activeTerrain.GetComponent<MeshRenderer>();
+                if (mr != null) DestroyImmediate(mr);
             }
 
             activeTerrain.terrainData = terrainData;

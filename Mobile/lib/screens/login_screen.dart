@@ -4,11 +4,12 @@ import '../models/fleet_models.dart';
 import '../services/fms_api_service.dart';
 import '../theme/fms_theme.dart';
 import '../widgets/server_settings_dialog.dart';
+import 'cabin_dashboard_screen.dart';
 import 'fms_menu_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  final VoidCallback onLoginSuccess;
-  const LoginScreen({super.key, required this.onLoginSuccess});
+  final VoidCallback? onLoginSuccess;
+  const LoginScreen({super.key, this.onLoginSuccess});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -21,9 +22,44 @@ class _LoginScreenState extends State<LoginScreen> {
   bool onlyFresh = true;
 
   @override
+  void initState() {
+    super.initState();
+    api.addListener(_onApiChange);
+    api.syncFromBackend();
+  }
+
+  void _onApiChange() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
+    api.removeListener(_onApiChange);
     search.dispose();
     super.dispose();
+  }
+
+  void _enterCabin(FleetUnit? unit) {
+    final target = unit ??
+        (selectedName != null
+            ? api.haulerUnits.where((u) => u.unitName == selectedName).firstOrNull
+            : null) ??
+        api.haulerUnits.firstOrNull;
+    if (target == null) return;
+    api.login('', '', target.unitName);
+
+    if (widget.onLoginSuccess != null) {
+      try {
+        widget.onLoginSuccess!();
+        return;
+      } catch (_) {}
+    }
+
+    if (mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const CabinDashboardScreen()),
+      );
+    }
   }
 
   @override
@@ -32,6 +68,14 @@ class _LoginScreenState extends State<LoginScreen> {
     final units = api.haulerUnits.toList()
       ..sort((a, b) {
         if (a.hasFreshGps != b.hasFreshGps) return a.hasFreshGps ? -1 : 1;
+        if (a.hasFreshGps && b.hasFreshGps) {
+          final aMoving = a.speedKmh > 1.0;
+          final bMoving = b.speedKmh > 1.0;
+          if (aMoving != bMoving) return aMoving ? -1 : 1;
+          if (a.lastHeardSecondsAgo != b.lastHeardSecondsAgo) {
+            return a.lastHeardSecondsAgo.compareTo(b.lastHeardSecondsAgo);
+          }
+        }
         return a.unitName.compareTo(b.unitName);
       });
     final query = search.text.trim().toUpperCase();
@@ -42,9 +86,12 @@ class _LoginScreenState extends State<LoginScreen> {
               (query.isEmpty || unit.unitName.toUpperCase().contains(query)),
         )
         .toList();
-    final selected = visible.where((unit) => unit.unitName == selectedName).firstOrNull;
+    final selected = visible.where((unit) => unit.unitName == selectedName).firstOrNull ??
+        units.where((unit) => unit.unitName == selectedName).firstOrNull ??
+        (visible.isNotEmpty ? visible.first : (units.isNotEmpty ? units.first : null));
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: const Color(0xFF0D1517),
       body: SafeArea(
         child: Center(
@@ -239,14 +286,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         : Colors.transparent,
                     child: InkWell(
                       onTap: () {
-                          if (selectedName == unit.unitName) {
-                            if (api.login('', '', unit.unitName)) {
-                              widget.onLoginSuccess();
-                            }
-                          } else {
-                            setState(() => selectedName = unit.unitName);
-                          }
-                        },
+                        setState(() => selectedName = unit.unitName);
+                      },
+                      onDoubleTap: () => _enterCabin(unit),
                       child: Container(
                         height: 54,
                         padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -292,11 +334,15 @@ class _LoginScreenState extends State<LoginScreen> {
                             Text(
                               unit.hasFreshGps
                                   ? 'GPS ${unit.lastHeardSecondsAgo}s'
-                                  : 'GPS lama',
+                                  : unit.hasGpsPosition
+                                      ? 'GPS ${unit.formattedGpsAge}'
+                                      : 'GPS TIDAK ADA',
                               style: FmsTheme.caption.copyWith(
                                 color: unit.hasFreshGps
                                     ? FmsTheme.emeraldGreen
-                                    : FmsTheme.amberWarning,
+                                    : unit.hasGpsPosition
+                                        ? FmsTheme.amberWarning
+                                        : FmsTheme.textMuted,
                               ),
                             ),
                           ],
@@ -315,10 +361,11 @@ class _LoginScreenState extends State<LoginScreen> {
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 330),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
               width: 54,
               height: 54,
               alignment: Alignment.center,
@@ -364,6 +411,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ],
         ),
+      ),
       ),
     );
   }
@@ -440,7 +488,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 'GPS',
                 unit.hasFreshGps
                     ? '${unit.lastHeardSecondsAgo} detik lalu'
-                    : 'Data lama',
+                    : unit.hasGpsPosition
+                        ? 'Data lama (${unit.formattedGpsAge})'
+                        : 'Tidak tersedia',
               ),
             ],
           ),
@@ -467,8 +517,14 @@ class _LoginScreenState extends State<LoginScreen> {
     children: [
       Expanded(
         child: Text(
-          'Pemilihan unit bukan autentikasi operator.',
-          style: FmsTheme.caption,
+          selected != null && !selected.hasGpsPosition
+              ? 'Peringatan: ${selected.unitName} tidak memiliki data GPS aktif.'
+              : 'Pemilihan unit bukan autentikasi operator.',
+          style: FmsTheme.caption.copyWith(
+            color: selected != null && !selected.hasGpsPosition
+                ? FmsTheme.amberWarning
+                : null,
+          ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -478,14 +534,12 @@ class _LoginScreenState extends State<LoginScreen> {
         height: 42,
         child: FilledButton.icon(
           onPressed: selected != null
-              ? () {
-                  if (api.login('', '', selected.unitName)) {
-                    widget.onLoginSuccess();
-                  }
-                }
+              ? () => _enterCabin(selected)
               : null,
           style: FilledButton.styleFrom(
-            backgroundColor: selected != null ? FmsTheme.emeraldGreen : null,
+            backgroundColor: selected != null
+                ? FmsTheme.emeraldGreen
+                : Colors.grey.shade800,
             foregroundColor: FmsTheme.bgDark,
             textStyle: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5),
           ),

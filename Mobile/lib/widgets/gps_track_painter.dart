@@ -17,6 +17,7 @@ class GpsTrackPainter extends CustomPainter {
   final String targetName;
   final bool held;
   final double animPhase;
+  final bool isDanger;
 
   const GpsTrackPainter({
     required this.track,
@@ -30,6 +31,7 @@ class GpsTrackPainter extends CustomPainter {
     this.targetName = 'Tujuan',
     required this.held,
     this.animPhase = 0.0,
+    this.isDanger = false,
   });
 
   @override
@@ -41,14 +43,20 @@ class GpsTrackPainter extends CustomPainter {
     // Deep high-tech tactical radar cockpit backdrop adaptive to current theme
     canvas.drawColor(FmsTheme.bgDark, BlendMode.src);
 
-    // Vignette background shader
+    // Vignette background shader (with danger ambient hue if active)
     final bgGlow = Paint()
       ..shader = RadialGradient(
-        colors: [
-          FmsTheme.surfaceDark.withValues(alpha: 0.70),
-          FmsTheme.bgDark.withValues(alpha: 0.92),
-          FmsTheme.bgDark,
-        ],
+        colors: isDanger
+            ? [
+                const Color(0x35FF1744),
+                FmsTheme.bgDark.withValues(alpha: 0.94),
+                FmsTheme.bgDark,
+              ]
+            : [
+                FmsTheme.surfaceDark.withValues(alpha: 0.70),
+                FmsTheme.bgDark.withValues(alpha: 0.92),
+                FmsTheme.bgDark,
+              ],
         stops: const [0.0, 0.65, 1.0],
       ).createShader(bounds);
     canvas.drawRect(bounds, bgGlow);
@@ -73,7 +81,10 @@ class GpsTrackPainter extends CustomPainter {
     // --- 1. POLAR RADAR RANGE RINGS & COMPASS TICKS ---
     _drawRadarGrid(canvas, size, origin, pixelsPerMeter);
 
-    // --- 2. REAL GPS BREADCRUMB TRAIL (Riwayat Jalur Nyata) ---
+    // --- 1B. ULTRA-THIN TACTICAL RADAR SWEEP (Jarum Radar Tipis Presisi) ---
+    _drawThinRadarSweep(canvas, origin, 350.0 * pixelsPerMeter);
+
+    // --- 2. REAL GPS BREADCRUMB TRAIL (Riwayat Jalur Nyata yang Halus) ---
     _drawGpsTrail(canvas, project);
 
     // --- 3. DYNAMIC NAVIGATION GUIDANCE BEAM & TARGET WAYPOINT ---
@@ -102,15 +113,17 @@ class GpsTrackPainter extends CustomPainter {
     Offset origin,
     double pixelsPerMeter,
   ) {
+    final ringColor = isDanger ? const Color(0xFF4A101D) : const Color(0xFF0E3846);
     final ringPaint = Paint()
-      ..color = const Color(0xFF0E3846).withValues(alpha: 0.55)
+      ..color = ringColor.withValues(alpha: isDanger ? 0.70 : 0.55)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.8;
+      ..strokeWidth = 0.6;
 
+    final outerRingColor = isDanger ? const Color(0xFFFF3366) : const Color(0xFF00E5FF);
     final outerRingPaint = Paint()
-      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.25)
+      ..color = outerRingColor.withValues(alpha: isDanger ? 0.65 : 0.25)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
+      ..strokeWidth = isDanger ? 1.4 : 1.0;
 
     // Range rings at 50m, 100m, 200m, 350m
     final ranges = [50.0, 100.0, 200.0, 350.0];
@@ -125,7 +138,7 @@ class GpsTrackPainter extends CustomPainter {
           text: TextSpan(
             text: '${ranges[i].toInt()}m',
             style: TextStyle(
-              color: const Color(0xFF00E5FF).withValues(alpha: 0.50),
+              color: outerRingColor.withValues(alpha: isDanger ? 0.75 : 0.50),
               fontSize: 8.5,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.5,
@@ -191,15 +204,96 @@ class GpsTrackPainter extends CustomPainter {
   }
 
   // =========================================================================
-  // 2. GPS BREADCRUMB TRAIL (Smooth Real Physical Path)
+  // 1B. ULTRA-THIN TACTICAL RADAR SWEEP (Jarum Radar Super Tipis Presisi Tinggi)
+  // =========================================================================
+  void _drawThinRadarSweep(Canvas canvas, Offset origin, double maxRadius) {
+    // 360-degree rotation based on animPhase (0.0 -> 1.0)
+    final sweepAngle = (animPhase * 2 * math.pi) - (math.pi / 2);
+    const trailAngle = math.pi / 14.0; // Ramping ~13 derajat agar jarum tampak tipis, tajam & elegan
+    const numFanSteps = 16;
+
+    // Sweep menjangkau seluruh grid radar hingga ring terluar
+    final radius = maxRadius;
+    final sweepColor = isDanger ? const Color(0xFFFF3366) : const Color(0xFF00E5FF);
+
+    // 1. Ethereal Phosphor Glow Fan (Kabut ekor fosfor halus)
+    for (int i = 0; i < numFanSteps; i++) {
+      final f1 = i / numFanSteps;
+      final f2 = (i + 1) / numFanSteps;
+      final a1 = sweepAngle - trailAngle * (1.0 - f1);
+      final a2 = sweepAngle - trailAngle * (1.0 - f2);
+      final alpha = (math.pow(f2, 2.6) * 0.12).clamp(0.0, 0.12);
+
+      final fanPath = Path()
+        ..moveTo(origin.dx, origin.dy)
+        ..lineTo(origin.dx + math.cos(a1) * radius, origin.dy + math.sin(a1) * radius)
+        ..lineTo(origin.dx + math.cos(a2) * radius, origin.dy + math.sin(a2) * radius)
+        ..close();
+
+      canvas.drawPath(
+        fanPath,
+        Paint()
+          ..color = sweepColor.withValues(alpha: alpha)
+          ..style = PaintingStyle.fill,
+      );
+    }
+
+    // 2. Needle Beam Tip Endpoint
+    final tip = Offset(
+      origin.dx + math.cos(sweepAngle) * radius,
+      origin.dy + math.sin(sweepAngle) * radius,
+    );
+
+    // 3. Delicate Luminous Glow Halo (1.8px)
+    canvas.drawLine(
+      origin,
+      tip,
+      Paint()
+        ..color = sweepColor.withValues(alpha: 0.35)
+        ..strokeWidth = 1.8
+        ..strokeCap = StrokeCap.round,
+    );
+
+    // 4. Ultra-Fine Razor Needle Core (jarum radar 1.0px super tajam & presisi)
+    canvas.drawLine(
+      origin,
+      tip,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.95)
+        ..strokeWidth = 1.0
+        ..strokeCap = StrokeCap.round,
+    );
+
+    // 5. Micro Tip Blip Dot (1.5px)
+    canvas.drawCircle(
+      tip,
+      1.5,
+      Paint()..color = sweepColor,
+    );
+    canvas.drawCircle(
+      tip,
+      0.8,
+      Paint()..color = Colors.white,
+    );
+
+    // 6. Center Reticle Glow Dot
+    canvas.drawCircle(
+      origin,
+      1.8,
+      Paint()..color = sweepColor.withValues(alpha: 0.85),
+    );
+  }
+
+  // =========================================================================
+  // 2. GPS BREADCRUMB TRAIL (Tactical Cyan with Progressive Age Fade)
   // =========================================================================
   void _drawGpsTrail(Canvas canvas, Offset Function(double, double) project) {
     if (track.length < 2) return;
 
-    final trailPath = Path();
-    bool hasMoved = false;
+    final n = track.length;
+    final baseColor = held ? const Color(0xFFFFB300) : const Color(0xFF00E5FF);
 
-    for (int i = 1; i < track.length; i++) {
+    for (int i = 1; i < n; i++) {
       final before = track[i - 1];
       final after = track[i];
       final dx = after.easting - before.easting;
@@ -217,45 +311,40 @@ class GpsTrackPainter extends CustomPainter {
       final p1 = project(before.easting, before.northing);
       final p2 = project(after.easting, after.northing);
 
-      if (!hasMoved) {
-        trailPath.moveTo(p1.dx, p1.dy);
-        hasMoved = true;
+      // Progressive age factor: 0.0 (oldest) to 1.0 (most recent)
+      final progress = i / n;
+      final alpha = (0.05 + progress * 0.45).clamp(0.04, 0.50);
+
+      // Soft glow on more recent segments
+      if (progress > 0.55) {
+        canvas.drawLine(
+          p1,
+          p2,
+          Paint()
+            ..color = baseColor.withValues(alpha: alpha * 0.35)
+            ..strokeWidth = 3.2
+            ..strokeCap = StrokeCap.round,
+        );
       }
-      trailPath.lineTo(p2.dx, p2.dy);
-    }
 
-    if (hasMoved) {
-      // Outer glow
-      canvas.drawPath(
-        trailPath,
+      // Crisp refined line segment (tipis 1.2px)
+      canvas.drawLine(
+        p1,
+        p2,
         Paint()
-          ..color = (held ? const Color(0xFFE5A93C) : const Color(0xFF00FFA3))
-              .withValues(alpha: 0.25)
-          ..strokeWidth = 6.0
-          ..style = PaintingStyle.stroke
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round,
+          ..color = baseColor.withValues(alpha: alpha)
+          ..strokeWidth = 1.2
+          ..strokeCap = StrokeCap.round,
       );
 
-      // Core crisp path
-      canvas.drawPath(
-        trailPath,
-        Paint()
-          ..color = held ? const Color(0xFFFFB84D) : const Color(0xFF00FFA3)
-          ..strokeWidth = 2.4
-          ..style = PaintingStyle.stroke
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round,
-      );
-    }
-
-    // Historical trail dots
-    final dotPaint = Paint()
-      ..color = (held ? const Color(0xFFFFD180) : const Color(0xFF80FFD4))
-          .withValues(alpha: 0.70);
-    for (int i = 0; i < track.length; i += 2) {
-      final pt = project(track[i].easting, track[i].northing);
-      canvas.drawCircle(pt, 1.8, dotPaint);
+      // Subtle breadcrumb dot at intervals
+      if (i % 2 == 0) {
+        canvas.drawCircle(
+          p2,
+          1.2,
+          Paint()..color = baseColor.withValues(alpha: alpha * 0.75),
+        );
+      }
     }
   }
 
@@ -486,7 +575,7 @@ class GpsTrackPainter extends CustomPainter {
   }
 
   // =========================================================================
-  // 4. SURROUNDING FLEET UNITS & PROXIMITY HAZARD RADAR
+  // 4. SURROUNDING FLEET UNITS & REAL PHOSPHOR RADAR DECAY BLIP
   // =========================================================================
   void _drawSurroundingFleet(
     Canvas canvas,
@@ -499,6 +588,18 @@ class GpsTrackPainter extends CustomPainter {
     final placedLabels = <Rect>[];
     final visibleBounds = Rect.fromLTRB(14, 28, size.width - 14, size.height - 28);
 
+    // Current radar sweep needle angle (0 = East, pi/2 = South, pi = West, -pi/2 = North)
+    final sweepAngle = (animPhase * 2 * math.pi) - (math.pi / 2);
+    double normalizeAngle(double a) {
+      a = a % (2 * math.pi);
+      if (a < 0) a += 2 * math.pi;
+      return a;
+    }
+    final normSweep = normalizeAngle(sweepAngle);
+
+    // Real PPI Radar phosphor persistence (~225 degrees = ~3.1 detik dari putaran 5 detik)
+    const decayAngle = math.pi * 1.25;
+
     for (final unit in nearbyVehicles) {
       final point = origin + Offset(
         unit.lateralOffsetMeters * pixelsPerMeter,
@@ -507,6 +608,48 @@ class GpsTrackPainter extends CustomPainter {
 
       // Skip if off screen or right on top of truck center
       if (!visibleBounds.contains(point) || (point - origin).distance < 14) {
+        continue;
+      }
+
+      final isCollisionAlert = unit.isCollisionWarning || unit.distanceMeters < 50.0;
+
+      // Calculate unit angle from origin in screen coordinates
+      final dx = point.dx - origin.dx;
+      final dy = point.dy - origin.dy;
+      final unitAngle = math.atan2(dy, dx);
+      final normUnit = normalizeAngle(unitAngle);
+
+      // Clockwise angular distance from sweep line to unit:
+      double anglePast = normSweep - normUnit;
+      if (anglePast < 0) anglePast += 2 * math.pi;
+
+      // Phosphor decay calculation:
+      // Saat tersapu: Ping flash terang benderang
+      // Paruh awal (~1.6 detik): Tetap 100% terang & jelas terbaca oleh operator
+      // Paruh akhir: Memudar secara halus dan bertahap
+      // Di luar jendela: Menghilang sejenak hingga putaran jarum berikutnya
+      double phosphorAlpha = 0.0;
+      if (anglePast < decayAngle) {
+        final progress = anglePast / decayAngle;
+        if (progress < 0.50) {
+          phosphorAlpha = 1.0;
+        } else {
+          final fadeProgress = (progress - 0.50) / 0.50;
+          phosphorAlpha = math.pow(1.0 - fadeProgress, 1.8).toDouble();
+        }
+      }
+
+      // Safety critical: Collision alert (<50m) keeps a pulsing warning silhouette even in the dark
+      final double effectiveAlpha;
+      if (isCollisionAlert) {
+        final pulseBase = 0.35 + 0.15 * math.sin(animPhase * 8 * math.pi).abs();
+        effectiveAlpha = math.max(pulseBase, phosphorAlpha);
+      } else {
+        effectiveAlpha = phosphorAlpha;
+      }
+
+      // If unit has faded out completely, skip drawing to achieve authentic radar stealth effect
+      if (effectiveAlpha < 0.02) {
         continue;
       }
 
@@ -529,9 +672,32 @@ class GpsTrackPainter extends CustomPainter {
           unitColor = const Color(0xFF90CAF9); // Blue
       }
 
-      final isCollisionAlert = unit.isCollisionWarning || unit.distanceMeters < 50.0;
       if (isCollisionAlert) {
         unitColor = const Color(0xFFFF3366); // Neon Red/Pink Danger
+      }
+
+      // --- 0. RADAR PING IMPACT FLASH (When needle line sweeps over unit) ---
+      if (anglePast < 0.12) {
+        final pingProgress = anglePast / 0.12; // 0.0 -> 1.0
+        final pingRadius = 6.0 + pingProgress * 15.0;
+        final pingAlpha = ((1.0 - pingProgress) * 0.75).clamp(0.0, 1.0);
+        canvas.drawCircle(
+          point,
+          pingRadius,
+          Paint()
+            ..color = (isCollisionAlert ? const Color(0xFFFF3366) : unitColor).withValues(alpha: pingAlpha)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.2,
+        );
+
+        if (anglePast < 0.05) {
+          // Instant hot center dot on contact
+          canvas.drawCircle(
+            point,
+            2.5,
+            Paint()..color = Colors.white.withValues(alpha: (1.0 - anglePast / 0.05) * 0.9),
+          );
+        }
       }
 
       // --- A. PROXIMITY COLLISION WARNING RING (<50m) ---
@@ -540,14 +706,14 @@ class GpsTrackPainter extends CustomPainter {
         canvas.drawCircle(
           point,
           18.0,
-          Paint()..color = const Color(0x33FF3366),
+          Paint()..color = const Color(0x33FF3366).withValues(alpha: 0.25 * effectiveAlpha),
         );
         canvas.drawCircle(
           point,
           18.0,
           Paint()
-            ..color = const Color(0xFFFF3366)
-            ..strokeWidth = 1.2
+            ..color = const Color(0xFFFF3366).withValues(alpha: 0.95 * effectiveAlpha)
+            ..strokeWidth = 1.3
             ..style = PaintingStyle.stroke,
         );
       } else {
@@ -555,7 +721,7 @@ class GpsTrackPainter extends CustomPainter {
         canvas.drawCircle(
           point,
           12.0,
-          Paint()..color = unitColor.withValues(alpha: 0.16),
+          Paint()..color = unitColor.withValues(alpha: 0.18 * effectiveAlpha),
         );
       }
 
@@ -568,11 +734,11 @@ class GpsTrackPainter extends CustomPainter {
           ..lineTo(point.dx, point.dy + 6)
           ..lineTo(point.dx - 6, point.dy)
           ..close();
-        canvas.drawPath(dPath, Paint()..color = unitColor);
+        canvas.drawPath(dPath, Paint()..color = unitColor.withValues(alpha: effectiveAlpha));
         canvas.drawPath(
           dPath,
           Paint()
-            ..color = const Color(0xFF030910)
+            ..color = const Color(0xFF030910).withValues(alpha: effectiveAlpha)
             ..style = PaintingStyle.stroke
             ..strokeWidth = 1.0,
         );
@@ -582,22 +748,22 @@ class GpsTrackPainter extends CustomPainter {
           Rect.fromCenter(center: point, width: 11, height: 11),
           const Radius.circular(2.5),
         );
-        canvas.drawRRect(hRect, Paint()..color = unitColor);
+        canvas.drawRRect(hRect, Paint()..color = unitColor.withValues(alpha: effectiveAlpha));
         canvas.drawRRect(
           hRect,
           Paint()
-            ..color = const Color(0xFF030910)
+            ..color = const Color(0xFF030910).withValues(alpha: effectiveAlpha)
             ..style = PaintingStyle.stroke
             ..strokeWidth = 1.0,
         );
       } else {
         // Circle for others
-        canvas.drawCircle(point, 5.0, Paint()..color = unitColor);
+        canvas.drawCircle(point, 5.0, Paint()..color = unitColor.withValues(alpha: effectiveAlpha));
         canvas.drawCircle(
           point,
           5.0,
           Paint()
-            ..color = const Color(0xFF030910)
+            ..color = const Color(0xFF030910).withValues(alpha: effectiveAlpha)
             ..style = PaintingStyle.stroke
             ..strokeWidth = 1.0,
         );
@@ -612,14 +778,17 @@ class GpsTrackPainter extends CustomPainter {
         text: TextSpan(
           children: [
             if (isCollisionAlert)
-              const TextSpan(
+              TextSpan(
                 text: '⚠️ ',
-                style: TextStyle(fontSize: 9.0),
+                style: TextStyle(
+                  fontSize: 9.0,
+                  color: const Color(0xFFFF3366).withValues(alpha: effectiveAlpha),
+                ),
               ),
             TextSpan(
               text: '${unit.unitName} ',
               style: TextStyle(
-                color: unitColor,
+                color: unitColor.withValues(alpha: effectiveAlpha),
                 fontSize: 9.5,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.2,
@@ -627,8 +796,8 @@ class GpsTrackPainter extends CustomPainter {
             ),
             TextSpan(
               text: distText,
-              style: const TextStyle(
-                color: Color(0xFFE0F2F1),
+              style: TextStyle(
+                color: const Color(0xFFE0F2F1).withValues(alpha: effectiveAlpha * 0.90),
                 fontSize: 8.5,
                 fontWeight: FontWeight.w600,
               ),
@@ -658,12 +827,15 @@ class GpsTrackPainter extends CustomPainter {
 
       canvas.drawRRect(
         RRect.fromRectAndRadius(labelRect, const Radius.circular(4)),
-        Paint()..color = isCollisionAlert ? const Color(0xF52A0A14) : const Color(0xF2071922),
+        Paint()
+          ..color = (isCollisionAlert ? const Color(0xF52A0A14) : const Color(0xF2071922))
+              .withValues(alpha: 0.94 * effectiveAlpha),
       );
       canvas.drawRRect(
         RRect.fromRectAndRadius(labelRect, const Radius.circular(4)),
         Paint()
-          ..color = unitColor.withValues(alpha: 0.75)
+          ..color = (isCollisionAlert ? const Color(0xFFFF3366) : unitColor)
+              .withValues(alpha: 0.80 * effectiveAlpha)
           ..strokeWidth = 1.0
           ..style = PaintingStyle.stroke,
       );
@@ -676,13 +848,14 @@ class GpsTrackPainter extends CustomPainter {
   // 5. OWN VEHICLE COCKPIT AVATAR & HEADLIGHT ILLUMINATION
   // =========================================================================
   void _drawOwnVehicle(Canvas canvas, Offset origin, double pixelsPerMeter) {
-    final truckColor = held ? const Color(0xFFFFB84D) : const Color(0xFF00FFA3);
+    final truckColor = held ? const Color(0xFFFFB84D) : const Color(0xFF00E5FF);
 
-    // Headlight Illuminating Spotlight Cone (Forward 40m)
+    // 1. Dynamic Xenon Twin Headlight Cones (Forward High-Beam Spotlight)
     final conePath = Path()
-      ..moveTo(origin.dx, origin.dy)
-      ..lineTo(origin.dx - 32, origin.dy - 65)
-      ..lineTo(origin.dx + 32, origin.dy - 65)
+      ..moveTo(origin.dx - 5, origin.dy - 12)
+      ..lineTo(origin.dx - 38, origin.dy - 85)
+      ..lineTo(origin.dx + 38, origin.dy - 85)
+      ..lineTo(origin.dx + 5, origin.dy - 12)
       ..close();
 
     final coneGradient = Paint()
@@ -690,73 +863,185 @@ class GpsTrackPainter extends CustomPainter {
         begin: Alignment.bottomCenter,
         end: Alignment.topCenter,
         colors: [
-          truckColor.withValues(alpha: 0.22),
-          truckColor.withValues(alpha: 0.04),
+          (held ? const Color(0xFFFFD180) : const Color(0xFF00E5FF)).withValues(alpha: 0.28),
+          (held ? const Color(0xFFFFE082) : const Color(0xFF80D8FF)).withValues(alpha: 0.08),
           Colors.transparent,
         ],
-      ).createShader(Rect.fromLTWH(origin.dx - 32, origin.dy - 65, 64, 65));
+      ).createShader(Rect.fromLTWH(origin.dx - 38, origin.dy - 85, 76, 85));
     canvas.drawPath(conePath, coneGradient);
 
-    // Safety Bubble Radius (15m buffer around vehicle)
+    // Twin High-Intensity Laser Beams
+    for (final side in [-6.0, 6.0]) {
+      canvas.drawLine(
+        Offset(origin.dx + side, origin.dy - 12),
+        Offset(origin.dx + side * 2.8, origin.dy - 65),
+        Paint()
+          ..color = Colors.white.withValues(alpha: 0.75)
+          ..strokeWidth = 1.3
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+
+    // 2. Dynamic Radar Scan Wave Propagation (Pulsing Halo Ring)
+    final pulseR = (10.0 + 22.0 * animPhase) * pixelsPerMeter.clamp(0.8, 1.8);
+    canvas.drawCircle(
+      origin,
+      pulseR,
+      Paint()
+        ..color = truckColor.withValues(alpha: (1.0 - animPhase) * 0.35)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2,
+    );
+
+    // Safety Buffer Zone (15m Circle)
     canvas.drawCircle(
       origin,
       15 * pixelsPerMeter,
       Paint()
         ..color = truckColor.withValues(alpha: 0.12)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0,
+        ..strokeWidth = 0.9,
     );
 
-    // Forward Direction Beam Pointer
+    // 3. Direction Vector Pointer with Neon Arrowhead
     canvas.drawLine(
-      origin,
-      Offset(origin.dx, origin.dy - 22),
+      origin.translate(0, -14),
+      origin.translate(0, -32),
       Paint()
         ..color = truckColor
         ..strokeWidth = 2.0
         ..strokeCap = StrokeCap.round,
     );
+    final tipPath = Path()
+      ..moveTo(origin.dx, origin.dy - 36)
+      ..lineTo(origin.dx - 4.5, origin.dy - 28)
+      ..lineTo(origin.dx + 4.5, origin.dy - 28)
+      ..close();
+    canvas.drawPath(tipPath, Paint()..color = truckColor);
 
-    // Heavy Equipment Chassis Silhouette
-    final truckBody = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: origin, width: 17, height: 26),
-      const Radius.circular(3.5),
+    // 4. Heavy Mining Dump Truck Wheels (6 Large Lugged Tires)
+    final tirePaint = Paint()..color = const Color(0xFF07141E);
+    final rimPaint = Paint()..color = const Color(0xFF00E5FF).withValues(alpha: 0.75);
+    for (final side in [-1.0, 1.0]) {
+      // Front Steer Tires
+      final fTire = RRect.fromRectAndRadius(
+        Rect.fromCenter(center: origin.translate(side * 11.5, -7), width: 4.8, height: 9.5),
+        const Radius.circular(1.5),
+      );
+      canvas.drawRRect(fTire, tirePaint);
+      canvas.drawRRect(fTire, Paint()..color = rimPaint.color..style = PaintingStyle.stroke..strokeWidth = 0.8);
+
+      // Rear Dual Drive Tires
+      for (final rOff in [5.5, 12.0]) {
+        final rTire = RRect.fromRectAndRadius(
+          Rect.fromCenter(center: origin.translate(side * 12.0, rOff), width: 5.2, height: 8.5),
+          const Radius.circular(1.5),
+        );
+        canvas.drawRRect(rTire, tirePaint);
+        canvas.drawRRect(rTire, Paint()..color = rimPaint.color..style = PaintingStyle.stroke..strokeWidth = 0.8);
+      }
+    }
+
+    // 5. Heavy Dump Body (Hauler Tray / Bed)
+    final dumpBed = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: origin.translate(0, 7.5), width: 20, height: 21),
+      const Radius.circular(2.5),
     );
-    canvas.drawRRect(truckBody, Paint()..color = truckColor);
+    canvas.drawRRect(dumpBed, Paint()..color = const Color(0xFF04121F));
     canvas.drawRRect(
-      truckBody,
+      dumpBed,
       Paint()
-        ..color = const Color(0xFFFFFFFF)
+        ..color = truckColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.3,
+    );
+
+    // Dump Bed Ribs (Reinforced Steel Ribs)
+    for (final ribY in [1.0, 6.5, 12.0]) {
+      canvas.drawLine(
+        Offset(origin.dx - 8.5, origin.dy + ribY),
+        Offset(origin.dx + 8.5, origin.dy + ribY),
+        Paint()
+          ..color = truckColor.withValues(alpha: 0.40)
+          ..strokeWidth = 0.9,
+      );
+    }
+
+    // 6. Forward Cab & Canopy Structure
+    final cabCanopy = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: origin.translate(0, -7.5), width: 18, height: 11),
+      const Radius.circular(2.5),
+    );
+    canvas.drawRRect(cabCanopy, Paint()..color = const Color(0xFF0091EA));
+    canvas.drawRRect(
+      cabCanopy,
+      Paint()
+        ..color = Colors.white
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.2,
     );
 
-    // Cab / Windshield Glass
+    // Driver Cab Glass Visor
+    final cabGlass = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: origin.translate(-2.5, -8.0), width: 8.5, height: 5.5),
+      const Radius.circular(1.5),
+    );
+    canvas.drawRRect(cabGlass, Paint()..color = const Color(0xFF031018));
     canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: origin.translate(0, -5), width: 12, height: 6),
-        const Radius.circular(1.5),
-      ),
-      Paint()..color = const Color(0xFF06222B),
+      cabGlass,
+      Paint()
+        ..color = const Color(0xFF00E5FF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8,
     );
 
-    // Wheel Tires
-    final wheelPaint = Paint()..color = const Color(0xFF102830);
-    for (final side in [-1.0, 1.0]) {
-      for (final offset in [-7.0, 7.0]) {
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            Rect.fromCenter(
-              center: origin.translate(side * 10, offset),
-              width: 4,
-              height: 7,
-            ),
-            const Radius.circular(1),
-          ),
-          wheelPaint,
-        );
-      }
+    // 7. Rooftop Amber / Cyan Rotating Warning Strobe Beacon
+    final strobeFlash = (math.sin(animPhase * math.pi * 4).abs() > 0.4);
+    final strobeColor = strobeFlash ? const Color(0xFFFFCC00) : const Color(0xFFFF6600);
+    canvas.drawCircle(
+      origin.translate(0, -12),
+      2.5,
+      Paint()..color = strobeColor,
+    );
+    if (strobeFlash) {
+      canvas.drawCircle(
+        origin.translate(0, -12),
+        6.0,
+        Paint()..color = strobeColor.withValues(alpha: 0.45),
+      );
     }
+
+    // 8. Vehicle Badge Emblem (Cockpit Tag)
+    final badgeText = TextPainter(
+      text: TextSpan(
+        text: '🚚 DT / HD',
+        style: TextStyle(
+          color: truckColor,
+          fontSize: 7.5,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.3,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final badgeRect = Rect.fromCenter(
+      center: origin.translate(0, 24),
+      width: badgeText.width + 8,
+      height: 12,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(badgeRect, const Radius.circular(3)),
+      Paint()..color = const Color(0xEE030E18),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(badgeRect, const Radius.circular(3)),
+      Paint()
+        ..color = truckColor.withValues(alpha: 0.65)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8,
+    );
+    badgeText.paint(canvas, Offset(badgeRect.left + 4, badgeRect.top + 1.5));
   }
 
   // =========================================================================
@@ -802,5 +1087,6 @@ class GpsTrackPainter extends CustomPainter {
       oldDelegate.targetNorthing != targetNorthing ||
       oldDelegate.targetName != targetName ||
       oldDelegate.held != held ||
-      oldDelegate.animPhase != animPhase;
+      oldDelegate.animPhase != animPhase ||
+      oldDelegate.isDanger != isDanger;
 }

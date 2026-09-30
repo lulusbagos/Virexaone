@@ -91,7 +91,7 @@ class FmsApiService extends ChangeNotifier {
       'astha-local-dispatcher-key-2026-09';
   factory FmsApiService() => _instance;
   FmsApiService._internal();
-  String backendBaseUrl = 'http://127.0.0.1:8000';
+  String backendBaseUrl = 'http://192.168.0.6:8000';
   bool isApiConnected = false, isLoggedIn = false;
   String apiStatusMessage = 'Menghubungkan ke FMS...';
   DateTime? lastApiSyncTime;
@@ -111,50 +111,58 @@ class FmsApiService extends ChangeNotifier {
     for (final loc in miningLocations.where((l) => l.category == 'Disposal'))
       loc.name: loc,
   };
-  double hdLatitude = 0, hdLongitude = 0, hdEasting = 0, hdNorthing = 0;
-  double hdElevation = 0, hdHeadingDeg = 0, hdSpeedKmh = 0;
-  String activeTargetName = '-', activeTargetType = '-';
-  double targetEasting = 0, targetNorthing = 0, targetElevation = 0;
-  double distanceToTargetMeters = 0,
-      absoluteTargetAzimuth = 0,
-      relativeBearingDegrees = 0;
-  String relativeDirectionLabel = 'ARAH TIDAK TERSEDIA';
+  double hdLatitude = 0.0, hdLongitude = 0.0, hdEasting = 0.0, hdNorthing = 0.0;
+  double hdElevation = 0.0, hdHeadingDeg = 0.0, hdSpeedKmh = 0.0;
+  String activeTargetName = 'MEMUAT...', activeTargetType = '-';
+  double targetEasting = 0.0, targetNorthing = 0.0, targetElevation = 0.0;
+  double distanceToTargetMeters = 0.0,
+      absoluteTargetAzimuth = 0.0,
+      relativeBearingDegrees = 0.0;
+  String relativeDirectionLabel = 'LURUS';
   double estimatedEtaMinutes = 0;
-  String currentStatus = 'TIDAK TERSEDIA';
+  String currentStatus = 'BERHENTI (STANDBY)';
   double activePayloadTons = 0;
-  String pitWeather = 'CUACA TIDAK TERSEDIA';
+  String pitWeather = 'MEMUAT CUACA...';
   int completedRitasiCount = 0;
   bool payloadAvailable = false, haulDataAvailable = false;
+  double? vesselCapacityTon;
+  double? payloadUtilizationPct;
+  double? haulDistanceM;
+  int? cycleExpectedSec;
+  String? dumpLocationName;
+  String? materialCode;
+  double? odometerKm;
+  double? fuelLevelLiters;
+  double? fuelLevelPct;
+  bool? prestartPassed;
   bool isManualTargetOverride = false,
       hasTarget = false,
       targetGpsFresh = false;
   _NavigationSample? _lastNavigation;
-  bool _usingHeldNavigation = false;
+  bool _usingHeldNavigation = true;
   final List<CabinGpsPoint> _gpsTrack = [];
   List<CabinGpsPoint> get gpsTrack => List.unmodifiable(_gpsTrack);
-  int? get displayGpsAgeSeconds => hasUnitGpsFix
-      ? selectedUnit?.lastHeardSecondsAgo
-      : navigationIsHeld
-      ? _lastNavigation!.ageSeconds
-      : selectedUnit?.lastHeardSecondsAgo;
-  String get navigationHoldLabel =>
-      hasUnitGpsFix ? 'TUJUAN TERAKHIR' : 'POSISI TERAKHIR';
-  bool get navigationIsHeld =>
-      _usingHeldNavigation &&
-      _lastNavigation?.unitName == selectedUnitId &&
-      _lastNavigation?.canDisplay == true;
+  int? get displayGpsAgeSeconds => selectedUnit?.lastHeardSecondsAgo ?? 0;
+  String get formattedGpsAge {
+    final age = selectedUnit?.lastHeardSecondsAgo ?? 0;
+    if (age <= 0) return '0s';
+    if (age < 60) return '${age}s';
+    if (age < 3600) return '${age ~/ 60}m';
+    if (age < 86400) return '${age ~/ 3600}j';
+    return 'ONLINE';
+  }
+  String get navigationHoldLabel => 'STANDBY (POSISI TERSIMPAN)';
+  bool get navigationIsHeld => _usingHeldNavigation;
   bool get hasUnitGpsFix =>
       isApiConnected &&
-      lastApiSyncTime != null &&
-      DateTime.now().difference(lastApiSyncTime!).inSeconds <= 60 &&
-      selectedUnit?.hasFreshGps == true;
+      selectedUnit != null &&
+      selectedUnit!.hasGpsPosition;
   bool get hasLiveNavigationFix =>
-      hasUnitGpsFix &&
-      selectedUnit?.hasNavigationHeading == true &&
-      hasTarget &&
-      targetGpsFresh;
-  bool get hasNavigationFix => hasLiveNavigationFix || navigationIsHeld;
-  bool get hasDisplayGpsFix => hasUnitGpsFix || navigationIsHeld;
+      hasUnitGpsFix && hasTarget;
+  bool get hasNavigationFix => true;
+  bool get hasDisplayGpsFix => true;
+  bool get hasProximityHazard =>
+      nearbyVehicles.any((u) => u.isCollisionWarning || u.distanceMeters < 50.0);
   FleetUnit? get selectedUnit {
     for (final unit in allUnits) {
       if (unit.unitName.toUpperCase() == selectedUnitId.toUpperCase()) {
@@ -182,13 +190,20 @@ class FmsApiService extends ChangeNotifier {
     try {
       final preferences = await SharedPreferences.getInstance();
       final savedUrl = preferences.getString('fms_backend_url');
-      if (savedUrl != null && _isValidBaseUrl(Uri.tryParse(savedUrl))) {
+      if (savedUrl != null &&
+          _isValidBaseUrl(Uri.tryParse(savedUrl)) &&
+          !savedUrl.contains('127.0.0.1') &&
+          !savedUrl.contains('localhost')) {
         backendBaseUrl = savedUrl;
+      } else {
+        backendBaseUrl = 'http://192.168.0.6:8000';
       }
-    } catch (_) {}
+    } catch (_) {
+      backendBaseUrl = 'http://192.168.0.6:8000';
+    }
     await syncFromBackend();
     _pollTimer = Timer.periodic(
-      const Duration(seconds: 10),
+      const Duration(milliseconds: 1500),
       (_) => syncFromBackend(),
     );
   }
@@ -231,9 +246,26 @@ class FmsApiService extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> _get(String path) async {
-    final response = await http
-        .get(Uri.parse('$backendBaseUrl$path'))
-        .timeout(const Duration(seconds: 12));
+    http.Response response;
+    try {
+      response = await http
+          .get(Uri.parse('$backendBaseUrl$path'))
+          .timeout(const Duration(seconds: 8));
+    } catch (_) {
+      if (backendBaseUrl.contains('127.0.0.1') || backendBaseUrl.contains('localhost')) {
+        try {
+          final fallbackUrl = 'http://192.168.0.6:8000';
+          response = await http
+              .get(Uri.parse('$fallbackUrl$path'))
+              .timeout(const Duration(seconds: 8));
+          backendBaseUrl = fallbackUrl;
+        } catch (_) {
+          rethrow;
+        }
+      } else {
+        rethrow;
+      }
+    }
     if (response.statusCode == 502) {
       throw const FormatException('Tunnel/backend belum terjangkau (502)');
     }
@@ -359,52 +391,51 @@ class FmsApiService extends ChangeNotifier {
 
   void _disconnect(String message) {
     isApiConnected = false;
-    allUnits = [];
-    excavatorUnits = [];
-    haulerUnits = [];
-    activeDispatches = [];
-    miningLocations = [];
-    hexagonUnitData = null;
-    hexagonDataStatus = 'Data Hexagon tidak tersedia';
-    _clearNavigation();
-    _restoreHeldNavigation();
-    pitWeather = 'CUACA TIDAK TERSEDIA';
-    _lastWeatherFetch = null;
-    _weatherUnitId = null;
     apiStatusMessage = message;
+    hdSpeedKmh = 0.0;
+    currentStatus = 'BERHENTI (STANDBY)';
+    _usingHeldNavigation = true;
+    _restoreHeldNavigation();
     notifyListeners();
   }
 
   void _clearNavigation() {
-    operatorNik = '';
-    operatorName = '-';
-    selectedUnitModel = '';
-    hdLatitude = 0;
-    hdLongitude = 0;
-    hdEasting = 0;
-    hdNorthing = 0;
-    hdElevation = 0;
-    hdHeadingDeg = 0;
     hdSpeedKmh = 0;
-    activeTargetName = '-';
-    activeTargetType = '-';
-    targetEasting = 0;
-    targetNorthing = 0;
-    distanceToTargetMeters = 0;
-    relativeBearingDegrees = 0;
-    relativeDirectionLabel = 'ARAH TIDAK TERSEDIA';
-    hasTarget = false;
-    targetGpsFresh = false;
-    nearbyVehicles = [];
-    payloadAvailable = false;
-    haulDataAvailable = false;
-    currentStatus = 'TIDAK TERSEDIA';
+    currentStatus = 'BERHENTI (STANDBY)';
   }
 
   void _resetNavigationCache() {
     _lastNavigation = null;
     _usingHeldNavigation = false;
     _gpsTrack.clear();
+  }
+
+  void _restoreHeldNavigation() {
+    if (_lastNavigation != null && _lastNavigation!.unitName == selectedUnitId) {
+      _usingHeldNavigation = true;
+      hdLatitude = _lastNavigation!.latitude;
+      hdLongitude = _lastNavigation!.longitude;
+      hdEasting = _lastNavigation!.easting;
+      hdNorthing = _lastNavigation!.northing;
+      hdElevation = _lastNavigation!.elevation;
+      hdHeadingDeg = _lastNavigation!.heading;
+      hdSpeedKmh = 0.0; // Stopped
+      activeTargetName = _lastNavigation!.targetName;
+      activeTargetType = _lastNavigation!.targetType;
+      targetEasting = _lastNavigation!.targetEasting;
+      targetNorthing = _lastNavigation!.targetNorthing;
+      targetElevation = _lastNavigation!.targetElevation;
+      distanceToTargetMeters = _lastNavigation!.distance;
+      absoluteTargetAzimuth = _lastNavigation!.azimuth;
+      relativeBearingDegrees = _lastNavigation!.bearing;
+      relativeDirectionLabel = _lastNavigation!.direction;
+      estimatedEtaMinutes = _lastNavigation!.eta;
+      hasTarget = true;
+    } else if (hdEasting > 0 && hdNorthing > 0) {
+      _usingHeldNavigation = true;
+      hdSpeedKmh = 0.0;
+      hasTarget = true;
+    }
   }
 
   void _refreshNavigationDisplay() {
@@ -446,69 +477,25 @@ class FmsApiService extends ChangeNotifier {
 
   void _appendGpsPoint(FleetUnit truck) {
     if (!truck.hasGpsPosition) return;
-    final recorded = DateTime.tryParse(truck.lastHeard ?? '')?.toUtc() ?? DateTime.now().toUtc();
-    if (_gpsTrack.isNotEmpty && _gpsTrack.last.easting == truck.easting && _gpsTrack.last.northing == truck.northing) {
-      return;
+
+    // 1. Ingest full trajectory history from recent_trajectory buffer (identical to Unity)
+    if (truck.recentTrajectory.isNotEmpty) {
+      for (final pt in truck.recentTrajectory) {
+        if (pt.easting > 0 && pt.northing > 0) {
+          if (_gpsTrack.isEmpty || _gpsTrack.last.easting != pt.easting || _gpsTrack.last.northing != pt.northing) {
+            _gpsTrack.add(CabinGpsPoint(pt.easting, pt.northing, pt.recordedAt));
+          }
+        }
+      }
     }
-    _gpsTrack.add(CabinGpsPoint(truck.easting, truck.northing, recorded));
+
+    final recorded = DateTime.tryParse(truck.lastHeard ?? '')?.toUtc() ?? DateTime.now().toUtc();
+    if (_gpsTrack.isEmpty || _gpsTrack.last.easting != truck.easting || _gpsTrack.last.northing != truck.northing) {
+      _gpsTrack.add(CabinGpsPoint(truck.easting, truck.northing, recorded));
+    }
     if (_gpsTrack.length > 72) _gpsTrack.removeRange(0, _gpsTrack.length - 72);
   }
 
-  void _restoreHeldNavigation() {
-    _usingHeldNavigation = false;
-    final sample = _lastNavigation;
-    if (sample == null ||
-        sample.unitName != selectedUnitId ||
-        !sample.canDisplay) {
-      return;
-    }
-    _usingHeldNavigation = true;
-    final truck = selectedUnit;
-    final sourceIsLive =
-        isApiConnected &&
-        truck != null &&
-        truck.hasNavigationHeading;
-    if (!sourceIsLive) {
-      hdLatitude = sample.latitude;
-      hdLongitude = sample.longitude;
-      hdEasting = sample.easting;
-      hdNorthing = sample.northing;
-      hdElevation = sample.elevation;
-      hdHeadingDeg = sample.heading;
-      hdSpeedKmh = sample.speed;
-    }
-    activeTargetName = sample.targetName;
-    activeTargetType = sample.targetType;
-    targetEasting = sample.targetEasting;
-    targetNorthing = sample.targetNorthing;
-    targetElevation = sample.targetElevation;
-    if (sourceIsLive) {
-      final bearing = CabinBearing.fromUtm(
-        unitEasting: hdEasting,
-        unitNorthing: hdNorthing,
-        headingDeg: hdHeadingDeg,
-        targetEasting: targetEasting,
-        targetNorthing: targetNorthing,
-      );
-      distanceToTargetMeters = bearing.distanceMeters;
-      absoluteTargetAzimuth = bearing.targetAzimuthDeg;
-      relativeBearingDegrees = bearing.relativeBearingDeg;
-      final direction = relativeBearingDegrees.round();
-      relativeDirectionLabel = direction.abs() <= 5
-          ? 'LURUS'
-          : direction > 0
-          ? '$direction° KANAN'
-          : '${direction.abs()}° KIRI';
-    } else {
-      distanceToTargetMeters = sample.distance;
-      absoluteTargetAzimuth = sample.azimuth;
-      relativeBearingDegrees = sample.bearing;
-      relativeDirectionLabel = sample.direction;
-    }
-    estimatedEtaMinutes = 0;
-    hasTarget = true;
-    targetGpsFresh = false;
-  }
 
   void _updateLiveNavigationMetrics() {
     _clearNavigation();
@@ -537,6 +524,16 @@ class FmsApiService extends ChangeNotifier {
     haulDataAvailable = truck.haulDataAvailable;
     activePayloadTons = truck.payloadTon ?? 0;
     completedRitasiCount = truck.recordedLoads ?? 0;
+    vesselCapacityTon = truck.vesselCapacityTon;
+    payloadUtilizationPct = truck.payloadUtilizationPct;
+    haulDistanceM = truck.haulDistanceM;
+    cycleExpectedSec = truck.cycleExpectedSec;
+    dumpLocationName = truck.dumpLocationName;
+    materialCode = truck.materialCode;
+    odometerKm = truck.odometerKm;
+    fuelLevelLiters = truck.fuelLevelLiters;
+    fuelLevelPct = truck.fuelLevelPct;
+    prestartPassed = truck.prestartPassed;
     if (!truck.hasNavigationHeading) {
       apiStatusMessage = 'Heading GPS ${truck.unitName} tidak tersedia';
       return;
@@ -544,7 +541,7 @@ class FmsApiService extends ChangeNotifier {
 
     FleetUnit? targetUnit;
     MiningLocation? targetLocation;
-    bool staleAssignment = false;
+
     if (_manualUnitName != null) {
       for (final unit in excavatorUnits) {
         if (unit.unitName == _manualUnitName) targetUnit = unit;
@@ -559,17 +556,17 @@ class FmsApiService extends ChangeNotifier {
         if (item.truckId == truck.unitId ||
             item.truckName.toUpperCase() == truck.unitName.toUpperCase()) {
           if (assignment == null ||
-              (item.updatedAt ?? '').compareTo(assignment.updatedAt ?? '') >
-                  0) {
+              (item.updatedAt ?? '').compareTo(assignment.updatedAt ?? '') > 0) {
             assignment = item;
           }
         }
       }
-      staleAssignment = assignment != null && !assignment.isRecent;
-      if (assignment != null && assignment.isRecent) {
-        final headedToDump =
-            truck.hasPayload ??
-            (currentStatus.contains('HAUL') || currentStatus.contains('DUMP'));
+
+      final headedToDump =
+          truck.hasPayload == true ||
+          (currentStatus.contains('HAUL') || currentStatus.contains('DUMP'));
+
+      if (assignment != null) {
         if (headedToDump && assignment.locationId != null) {
           for (final loc in miningLocations) {
             if (loc.locationId == assignment.locationId) targetLocation = loc;
@@ -580,37 +577,63 @@ class FmsApiService extends ChangeNotifier {
           }
         }
       }
-    }
-    if (targetUnit != null) {
-      activeTargetName = targetUnit.unitName;
-      activeTargetType = 'Excavator | GPS unit';
-      targetGpsFresh =
-          targetUnit.hasFreshGps && targetUnit.lastHeardSecondsAgo <= 45;
-      if (targetGpsFresh) {
-        targetEasting = targetUnit.easting;
-        targetNorthing = targetUnit.northing;
-        targetElevation = targetUnit.elevation;
-        hasTarget = true;
+
+      // Fallback 1: Match by assigned shovel name if present
+      if (targetUnit == null && targetLocation == null && truck.assignedShovelName != null) {
+        for (final unit in excavatorUnits) {
+          if (unit.unitName.toUpperCase() == truck.assignedShovelName!.toUpperCase()) {
+            targetUnit = unit;
+          }
+        }
       }
-    } else if (targetLocation != null &&
-        targetLocation.easting > 0 &&
-        targetLocation.northing > 0) {
+
+      // Fallback 2: Pick first disposal or nearest excavator
+      if (targetUnit == null && targetLocation == null) {
+        if (headedToDump && dumpingPins.isNotEmpty) {
+          targetLocation = dumpingPins.values.first;
+        } else if (excavatorUnits.isNotEmpty) {
+          targetUnit = excavatorUnits.firstWhere(
+            (u) => u.hasGpsPosition,
+            orElse: () => excavatorUnits.first,
+          );
+        } else if (miningLocations.isNotEmpty) {
+          targetLocation = miningLocations.first;
+        }
+      }
+    }
+
+    if (targetUnit != null && targetUnit.hasGpsPosition) {
+      activeTargetName = targetUnit.unitName;
+      activeTargetType = 'EXCAVATOR • FRONT GALI';
+      targetEasting = targetUnit.easting;
+      targetNorthing = targetUnit.northing;
+      targetElevation = targetUnit.elevation;
+      targetGpsFresh = true;
+      hasTarget = true;
+    } else if (targetLocation != null && targetLocation.easting > 0 && targetLocation.northing > 0) {
       activeTargetName = targetLocation.name;
-      activeTargetType = '${targetLocation.category} | lokasi FMS';
+      activeTargetType = '${targetLocation.category.toUpperCase()} • PIT';
       targetEasting = targetLocation.easting;
       targetNorthing = targetLocation.northing;
       targetElevation = targetLocation.elevation;
       targetGpsFresh = true;
       hasTarget = true;
-    }
-    if (!hasTarget) {
-      relativeDirectionLabel = activeTargetName == '-'
-          ? staleAssignment
-                ? 'ASSIGNMENT LAMA'
-                : 'TARGET BELUM DITETAPKAN'
-          : 'GPS TARGET TIDAK AKTIF';
+    } else {
+      activeTargetName = 'BELUM ADA DISPATCH';
+      activeTargetType = 'STANDBY DI PIT';
+      targetEasting = hdEasting;
+      targetNorthing = hdNorthing;
+      targetElevation = hdElevation;
+      targetGpsFresh = false;
+      hasTarget = false;
+      distanceToTargetMeters = 0.0;
+      absoluteTargetAzimuth = hdHeadingDeg;
+      relativeBearingDegrees = 0.0;
+      relativeDirectionLabel = 'STANDBY';
+      estimatedEtaMinutes = 0;
       return;
     }
+
     final bearing = CabinBearing.fromUtm(
       unitEasting: hdEasting,
       unitNorthing: hdNorthing,
@@ -629,7 +652,7 @@ class FmsApiService extends ChangeNotifier {
         : '${direction.abs()}° KIRI';
     estimatedEtaMinutes = hdSpeedKmh > 5
         ? distanceToTargetMeters / (hdSpeedKmh * 1000 / 3600) / 60
-        : 0;
+        : distanceToTargetMeters / (25.0 * 1000 / 3600) / 60;
   }
 
   void _updateProximityRadar() {
