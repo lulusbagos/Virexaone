@@ -89,15 +89,7 @@ class _SplashScreenState extends State<SplashScreen>
       PageRouteBuilder(
         pageBuilder: (context, anim, secAnim) => _api.isLoggedIn
             ? const CabinDashboardScreen()
-            : LoginScreen(
-                onLoginSuccess: () {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (_) => const CabinDashboardScreen(),
-                    ),
-                  );
-                },
-              ),
+            : const LoginScreen(),
         transitionsBuilder: (context, anim, secAnim, child) =>
             FadeTransition(opacity: anim, child: child),
         transitionDuration: const Duration(milliseconds: 500),

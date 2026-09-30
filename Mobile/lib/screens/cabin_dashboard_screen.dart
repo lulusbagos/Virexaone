@@ -75,15 +75,7 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
       _api.logout();
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (navContext) => LoginScreen(
-            onLoginSuccess: () {
-              Navigator.of(navContext).pushReplacement(
-                MaterialPageRoute(
-                  builder: (_) => const CabinDashboardScreen(),
-                ),
-              );
-            },
-          ),
+          builder: (_) => const LoginScreen(),
         ),
         (route) => false,
       );

@@ -48,18 +48,14 @@ class _LoginScreenState extends State<LoginScreen> {
     if (target == null) return;
     api.login('', '', target.unitName);
 
-    if (widget.onLoginSuccess != null) {
-      try {
-        widget.onLoginSuccess!();
-        return;
-      } catch (_) {}
-    }
-
     if (mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const CabinDashboardScreen()),
       );
     }
+    try {
+      widget.onLoginSuccess?.call();
+    } catch (_) {}
   }
 
   @override
