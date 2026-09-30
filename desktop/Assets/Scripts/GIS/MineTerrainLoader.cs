@@ -4,6 +4,7 @@ using UnityEngine;
 
 namespace Virexa.FMS
 {
+    [DefaultExecutionOrder(-100)]
     [ExecuteAlways]
     public class MineTerrainLoader : MonoBehaviour
     {
@@ -75,24 +76,26 @@ namespace Virexa.FMS
         {
             if (geotiffTexture == null)
             {
-                geotiffTexture = Resources.Load<Texture2D>("Textures/geotiff_ortho_4k");
 #if UNITY_EDITOR
+                geotiffTexture = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/PitUnggul_TIF_Texture.png")
+                              ?? UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/PitUnggul_RealOrtho.png")
+                              ?? UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/geotiff_ortho_4k.jpg");
+#endif
                 if (geotiffTexture == null)
                 {
-                    geotiffTexture = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/geotiff_ortho_4k.jpg");
+                    geotiffTexture = Resources.Load<Texture2D>("Textures/geotiff_ortho_4k");
                 }
-#endif
             }
 
             if (elevationBytesAsset == null)
             {
-                elevationBytesAsset = Resources.Load<TextAsset>("Data/terrain_elevation");
 #if UNITY_EDITOR
+                elevationBytesAsset = UnityEditor.AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Data/terrain_elevation.bytes");
+#endif
                 if (elevationBytesAsset == null)
                 {
-                    elevationBytesAsset = UnityEditor.AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Data/terrain_elevation.bytes");
+                    elevationBytesAsset = Resources.Load<TextAsset>("Data/terrain_elevation");
                 }
-#endif
             }
         }
 
@@ -148,20 +151,23 @@ namespace Virexa.FMS
             Vector3[] vertices = new Vector3[totalVertices];
             Vector2[] uvs = new Vector2[totalVertices];
 
+            float minX = (float)(570144.2313292557 - GeoCoordinateConverter.ORIGIN_UTM_X); // ~ -2584.07m
+            float minZ = (float)(110653.65266003287 - GeoCoordinateConverter.ORIGIN_UTM_Y); // ~ -2684.65m
+
             float stepX = terrainWidthM / (gridCols - 1);
             float stepZ = terrainHeightM / (gridRows - 1);
 
             int vIdx = 0;
             for (int r = 0; r < gridRows; r++)
             {
-                // In Unity, Z=0 is South, Z=Height is North
-                // In array, row 0 is North (top), row gridRows-1 is South (bottom)
-                float z = (gridRows - 1 - r) * stepZ;
+                // In Unity, Z=minZ is South, Z=maxZ is North
+                // In LiDAR array, row 0 is North (top), row gridRows-1 is South (bottom)
+                float z = minZ + (gridRows - 1 - r) * stepZ;
                 float v = (float)(gridRows - 1 - r) / (gridRows - 1);
 
                 for (int c = 0; c < gridCols; c++)
                 {
-                    float x = c * stepX;
+                    float x = minX + c * stepX;
                     float u = (float)c / (gridCols - 1);
                     float y = elevations[r, c] * verticalExaggeration;
 
@@ -210,12 +216,18 @@ namespace Virexa.FMS
         {
             if (terrainMaterial == null)
             {
-                Shader shader = Shader.Find("Virexa/GeoTIFF_Terrain_DoubleSided") 
-                             ?? Shader.Find("Standard") 
-                             ?? Shader.Find("Unlit/Texture");
+#if UNITY_EDITOR
+                terrainMaterial = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Mat_RealGIS_Terrain.mat");
+#endif
+                if (terrainMaterial == null)
+                {
+                    Shader shader = Shader.Find("Virexa/TerrainContourShader")
+                                 ?? Shader.Find("Virexa/GeoTIFF_Terrain_DoubleSided") 
+                                 ?? Shader.Find("Standard");
 
-                terrainMaterial = new Material(shader);
-                terrainMaterial.name = "Terrain_GeoTIFF_Material";
+                    terrainMaterial = new Material(shader);
+                    terrainMaterial.name = "Mat_RealGIS_Terrain";
+                }
             }
 
             if (geotiffTexture != null)

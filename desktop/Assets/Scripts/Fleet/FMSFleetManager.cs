@@ -617,7 +617,7 @@ namespace Virexa.FMS
                 if (visualOffset.sqrMagnitude > 0.01f)
                 {
                     Terrain terrain = Terrain.activeTerrain;
-                    if (terrain != null)
+                    if (terrain != null && terrain.isActiveAndEnabled && terrain.terrainData != null)
                     {
                         float originalHeight = terrain.SampleHeight(origin);
                         float displayHeight = terrain.SampleHeight(candidate);

@@ -304,6 +304,9 @@ namespace Virexa.FMS
             talkbackStartTime = Time.time;
             talkbackDuration = 0f;
 
+            EnsureLiveVoiceTransceiver();
+            FMSLiveVoiceTransceiver.Instance?.StartTransmitting(talkbackTargetUnit);
+
             OnTalkbackStateChanged?.Invoke(true, talkbackTargetUnit);
             Mobile.OperatorAudioFeedbackManager.Instance?.PlayDispatchAlert();
             TriggerNotification($"🎙️ [TALKBACK DISPATCH AKTIF] Transmisi suara live ke: {talkbackTargetUnit}...");
@@ -319,12 +322,26 @@ namespace Virexa.FMS
             isTalkbackActive = false;
             float finalDuration = talkbackDuration;
 
+            FMSLiveVoiceTransceiver.Instance?.StopTransmitting();
+
             OnTalkbackStateChanged?.Invoke(false, talkbackTargetUnit);
             Mobile.OperatorAudioFeedbackManager.Instance?.PlayButtonClick();
 
             string targetLabel = talkbackTargetUnit == "ALL" ? "Seluruh Armada (Broadcast)" : talkbackTargetUnit;
             SendFromControlRoom(talkbackTargetUnit, $"🎙️ [TRANSMISI SUARA RADIO ({finalDuration:F1}s)] ke {targetLabel}");
             TriggerNotification($"🎙️ [TALKBACK SELESAI] Transmisi suara {finalDuration:F1}s terkirim ke {talkbackTargetUnit}.");
+        }
+
+        public void EnsureLiveVoiceTransceiver()
+        {
+            if (FMSLiveVoiceTransceiver.Instance == null)
+            {
+                var existing = FindFirstObjectByType<FMSLiveVoiceTransceiver>();
+                if (existing == null)
+                {
+                    gameObject.AddComponent<FMSLiveVoiceTransceiver>();
+                }
+            }
         }
 
         /// <summary>
@@ -556,6 +573,44 @@ namespace Virexa.FMS
                                 FMSCameraController.Instance?.SetFollowTarget(unitCtrl.transform);
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        public void RefreshMessagesFromBackend()
+        {
+            StartCoroutine(FetchBackendMessagesOnce());
+        }
+
+        private IEnumerator FetchBackendMessagesOnce()
+        {
+            string baseUrl = FMSDashboardUI.Instance != null && !string.IsNullOrWhiteSpace(FMSDashboardUI.Instance.apiBaseUrl)
+                ? FMSDashboardUI.Instance.apiBaseUrl : backendBaseUrl;
+
+            if (string.IsNullOrWhiteSpace(baseUrl)) yield break;
+
+            string url = baseUrl.TrimEnd('/') + "/api/v1/comms/messages?unit_name=ALL";
+            using (var request = UnityWebRequest.Get(url))
+            {
+                FMSApiSession.AuthorizeDispatcher(request);
+                request.timeout = 4;
+                yield return request.SendWebRequest();
+
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    string json = request.downloadHandler.text;
+                    if (!string.IsNullOrWhiteSpace(json))
+                    {
+                        try
+                        {
+                            var resp = JsonUtility.FromJson<BackendCommsMessageListResponse>(json);
+                            if (resp != null && resp.data != null)
+                            {
+                                ProcessInboundBackendMessages(resp.data);
+                            }
+                        }
+                        catch { }
                     }
                 }
             }

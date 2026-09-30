@@ -15,9 +15,9 @@ namespace Virexa.FMS.Editor
         {
             EditorApplication.delayCall += () =>
             {
-                // Auto build on initial load if scene doesn't have terrain
+                // Auto build on initial load if active scene doesn't have terrain
                 Terrain t = UnityEngine.Object.FindFirstObjectByType<Terrain>();
-                if (t == null && SceneManager.GetActiveScene().name == "FMS_Mine_Main")
+                if (t == null && !EditorApplication.isPlayingOrWillChangePlaymode)
                 {
                     BuildScene();
                 }

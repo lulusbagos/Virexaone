@@ -97,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
           border: Border.all(color: FmsTheme.emeraldGreen),
           color: const Color(0xFF15302D),
         ),
-        child: const Icon(
+        child: Icon(
           Icons.precision_manufacturing_outlined,
           color: FmsTheme.emeraldGreen,
           size: 26,
@@ -128,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
           context: context,
           builder: (_) => const FmsMenuScreen(),
         ),
-        icon: const Icon(Icons.menu, color: FmsTheme.textLight),
+        icon: Icon(Icons.menu, color: FmsTheme.textLight),
       ),
       IconButton(
         tooltip: 'Pengaturan server',
@@ -136,7 +136,7 @@ class _LoginScreenState extends State<LoginScreen> {
           context: context,
           builder: (_) => const ServerSettingsDialog(),
         ),
-        icon: const Icon(Icons.settings_outlined, color: FmsTheme.textLight),
+        icon: Icon(Icons.settings_outlined, color: FmsTheme.textLight),
       ),
     ],
   );
@@ -177,7 +177,7 @@ class _LoginScreenState extends State<LoginScreen> {
         IconButton(
           tooltip: 'Segarkan data',
           onPressed: api.syncFromBackend,
-          icon: const Icon(Icons.refresh, color: FmsTheme.cyanAccent),
+          icon: Icon(Icons.refresh, color: FmsTheme.cyanAccent),
         ),
       ],
     ),
@@ -370,8 +370,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _unitDetails(FleetUnit? unit) => Container(
     padding: const EdgeInsets.all(12),
-    decoration: const BoxDecoration(
-      color: Color(0xFF182126),
+    decoration: BoxDecoration(
+      color: const Color(0xFF182126),
       border: Border(top: BorderSide(color: FmsTheme.emeraldGreen, width: 2)),
     ),
     child: unit == null

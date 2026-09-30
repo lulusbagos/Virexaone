@@ -197,7 +197,7 @@ namespace Virexa.FMS
         {
             // Sample terrain height for maximum precision
             Terrain t = Terrain.activeTerrain ?? FindFirstObjectByType<Terrain>();
-            if (t != null)
+            if (t != null && t.isActiveAndEnabled && t.terrainData != null)
             {
                 float groundY = t.SampleHeight(worldPos) + t.transform.position.y;
                 worldPos.y = groundY + 0.35f; // Slight elevation offset to avoid z-fighting

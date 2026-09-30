@@ -23,7 +23,7 @@ Mobile/build/
 Mobile/.flutter-plugins
 Mobile/.flutter-plugins-dependencies
 Mobile/.packages
-Mobile/android/.gradle/
+**/.gradle/
 Mobile/android/local.properties
 Mobile/ios/.symlinks/
 Mobile/ios/Pods/

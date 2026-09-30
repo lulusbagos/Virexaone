@@ -215,13 +215,16 @@ api.MapPost("/comms/live-ticket", async (HttpContext context, CabinCommsService 
     LiveCabinCommsService live, CabinPairInput input, CancellationToken token) =>
 {
     if (!comms.Enabled) return Results.Json(new { error = "comms_disabled" }, statusCode: 503);
-    if (!CabinCommsService.ValidUnit(input.unit_name) || input.unit_name == "ALL")
-        return Results.BadRequest(new { error = "invalid_unit" });
     bool dispatcher = comms.DispatcherAuthorized(context.Request.Headers["X-FMS-Dispatcher-Key"].ToString());
-    if (!dispatcher && !await comms.UnitAuthorizedAsync(input.unit_name,
-        context.Request.Headers["X-FMS-Unit-Key"].ToString(), token))
-        return Results.Json(new { error = "forbidden" }, statusCode: 403);
-    string ticket = live.IssueTicket(input.unit_name, dispatcher ? "dispatcher" : "cabin");
+    if (!dispatcher)
+    {
+        if (!CabinCommsService.ValidUnit(input.unit_name) || input.unit_name == "ALL")
+            return Results.BadRequest(new { error = "invalid_unit" });
+        if (!await comms.UnitAuthorizedAsync(input.unit_name, context.Request.Headers["X-FMS-Unit-Key"].ToString(), token))
+            return Results.Json(new { error = "forbidden" }, statusCode: 403);
+    }
+    string unitName = string.IsNullOrWhiteSpace(input.unit_name) ? "ALL" : input.unit_name;
+    string ticket = live.IssueTicket(unitName, dispatcher ? "dispatcher" : "cabin");
     return Results.Ok(new { ticket, expires_in_seconds = 30 });
 });
 

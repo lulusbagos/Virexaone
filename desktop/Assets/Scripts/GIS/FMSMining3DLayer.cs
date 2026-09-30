@@ -462,7 +462,7 @@ namespace Virexa.FMS
 
             float terrainY = 75f;
             Terrain t = Terrain.activeTerrain ?? FindFirstObjectByType<Terrain>();
-            if (t != null)
+            if (t != null && t.isActiveAndEnabled && t.terrainData != null)
             {
                 Vector3 samplePos = new Vector3(localX, 0f, localZ);
                 terrainY = t.SampleHeight(samplePos) + t.transform.position.y;
@@ -941,7 +941,7 @@ namespace Virexa.FMS
 
         private static float SampleRoadHeight(Vector3 point, Terrain terrain, MeshCollider terrainMesh)
         {
-            if (terrain != null) return terrain.SampleHeight(point) + terrain.transform.position.y;
+            if (terrain != null && terrain.isActiveAndEnabled && terrain.terrainData != null) return terrain.SampleHeight(point) + terrain.transform.position.y;
             if (terrainMesh != null)
             {
                 Ray ray = new Ray(new Vector3(point.x, terrainMesh.bounds.max.y + 100f, point.z), Vector3.down);

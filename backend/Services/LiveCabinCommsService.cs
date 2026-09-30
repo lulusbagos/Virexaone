@@ -72,7 +72,8 @@ public sealed class LiveCabinCommsService
                     catch (JsonException) { continue; }
                     if (command == "ptt_start")
                     {
-                        if (speakers.TryAdd(peer.Unit, peer.Id))
+                        string speakerKey = peer.Role == "dispatcher" ? $"disp_{peer.Id}" : peer.Unit;
+                        if (speakers.TryAdd(speakerKey, peer.Id))
                         {
                             peer.Speaking = true;
                             await BroadcastAsync(peer, "voice_start", context.RequestAborted);
@@ -87,9 +88,14 @@ public sealed class LiveCabinCommsService
                     peer.Speaking && frame.Count <= 8192 && frame.Count % 2 == 0)
                 {
                     foreach (var listener in peers.Values)
-                        if (listener.Unit == peer.Unit && listener.Role != peer.Role)
+                    {
+                        if (listener.Id == peer.Id) continue;
+                        if (peer.Role == "dispatcher" || listener.Role == "dispatcher" || listener.Unit == peer.Unit || listener.Unit == "ALL" || peer.Unit == "ALL")
+                        {
                             await SendAsync(listener, buffer.AsMemory(0, frame.Count),
                                 WebSocketMessageType.Binary, context.RequestAborted);
+                        }
+                    }
                 }
             }
         }
@@ -127,7 +133,8 @@ public sealed class LiveCabinCommsService
     {
         if (!peer.Speaking) return;
         peer.Speaking = false;
-        speakers.TryRemove(new KeyValuePair<string, Guid>(peer.Unit, peer.Id));
+        string speakerKey = peer.Role == "dispatcher" ? $"disp_{peer.Id}" : peer.Unit;
+        speakers.TryRemove(new KeyValuePair<string, Guid>(speakerKey, peer.Id));
         await BroadcastAsync(peer, "voice_stop", token);
     }
 
@@ -135,8 +142,13 @@ public sealed class LiveCabinCommsService
     {
         string json = JsonSerializer.Serialize(new { type, unit_name = sender.Unit, sender_role = sender.Role });
         foreach (var peer in peers.Values)
-            if (peer.Unit == sender.Unit && peer.Role != sender.Role)
+        {
+            if (peer.Id == sender.Id) continue;
+            if (sender.Role == "dispatcher" || peer.Role == "dispatcher" || peer.Unit == sender.Unit || sender.Unit == "ALL" || peer.Unit == "ALL")
+            {
                 await SendTextAsync(peer, json, token);
+            }
+        }
     }
 
     private Task SendTextAsync(Peer peer, string text, CancellationToken token) =>

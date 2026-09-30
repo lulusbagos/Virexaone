@@ -75,7 +75,7 @@ namespace Virexa.FMS
             heatmapRoot.transform.SetParent(this.transform);
 
             Terrain terrain = Terrain.activeTerrain;
-            if (terrain == null) return;
+            if (terrain == null || terrain.terrainData == null) return;
 
             TerrainData tData = terrain.terrainData;
             int res = 64; // 64x64 grid for high performance

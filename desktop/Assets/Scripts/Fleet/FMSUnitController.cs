@@ -1448,19 +1448,21 @@ namespace Virexa.FMS
             Terrain activeTerrain = Terrain.activeTerrain ?? FindFirstObjectByType<Terrain>();
             float targetY = transform.position.y;
             Vector3 targetNormal = Vector3.up;
+            bool aligned = false;
 
-            if (activeTerrain != null)
+            if (activeTerrain != null && activeTerrain.isActiveAndEnabled && activeTerrain.terrainData != null)
             {
                 targetY = activeTerrain.SampleHeight(transform.position) + activeTerrain.transform.position.y;
-                targetNormal = activeTerrain.terrainData.GetInterpolatedNormal(
-                    (transform.position.x - activeTerrain.transform.position.x) / activeTerrain.terrainData.size.x,
-                    (transform.position.z - activeTerrain.transform.position.z) / activeTerrain.terrainData.size.z
-                );
+                float normX = (transform.position.x - activeTerrain.transform.position.x) / Mathf.Max(1f, activeTerrain.terrainData.size.x);
+                float normZ = (transform.position.z - activeTerrain.transform.position.z) / Mathf.Max(1f, activeTerrain.terrainData.size.z);
+                targetNormal = activeTerrain.terrainData.GetInterpolatedNormal(Mathf.Clamp01(normX), Mathf.Clamp01(normZ));
+                aligned = true;
             }
-            else
+
+            if (!aligned)
             {
-                // Multi-hit raycast ignoring self and unit colliders to eliminate vertical ground flickering
-                RaycastHit[] hits = Physics.RaycastAll(transform.position + Vector3.up * 15f, Vector3.down, 50f);
+                // Multi-hit raycast from high altitude against 3D MeshCollider (MineTerrainLoader)
+                RaycastHit[] hits = Physics.RaycastAll(new Vector3(transform.position.x, 800f, transform.position.z), Vector3.down, 1200f);
                 float bestY = -9999f;
                 Vector3 bestNormal = Vector3.up;
                 bool foundGround = false;

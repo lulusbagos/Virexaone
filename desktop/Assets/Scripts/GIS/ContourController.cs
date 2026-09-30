@@ -7,8 +7,8 @@ namespace Virexa.FMS
         public static ContourController Instance { get; private set; }
 
         [Header("Contour Settings")]
-        [SerializeField] private bool _enableContours = false; // Default OFF for pure 4K GeoTIFF
-        [SerializeField] private float _contourInterval = 25.0f; // 25m interval
+        [SerializeField] private bool _enableContours = true; // Default ON for rich topographic contour visual
+        [SerializeField] private float _contourInterval = 10.0f; // 10m bench interval
         [SerializeField] private float _contourOpacity = 0.85f;
         [SerializeField] private Color _majorContourColor = new Color(1.0f, 0.78f, 0.15f, 0.95f);
 
@@ -35,6 +35,16 @@ namespace Virexa.FMS
             if (t != null && t.materialTemplate != null)
             {
                 _targetMaterial = t.materialTemplate;
+            }
+            else if (MineTerrainLoader.Instance != null && MineTerrainLoader.Instance.terrainMaterial != null)
+            {
+                _targetMaterial = MineTerrainLoader.Instance.terrainMaterial;
+            }
+            else
+            {
+                MeshRenderer mr = GameObject.Find("RealMining_Terrain_GIS")?.GetComponent<MeshRenderer>()
+                               ?? GameObject.Find("3D_Mine_Terrain")?.GetComponent<MeshRenderer>();
+                if (mr != null) _targetMaterial = mr.sharedMaterial;
             }
         }
 

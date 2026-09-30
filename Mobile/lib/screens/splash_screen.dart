@@ -156,7 +156,7 @@ class _SplashScreenState extends State<SplashScreen>
                               Container(
                                 width: 7,
                                 height: 7,
-                                decoration: const BoxDecoration(
+                                decoration: BoxDecoration(
                                   color: FmsTheme.emeraldGreen,
                                   shape: BoxShape.circle,
                                 ),
@@ -175,7 +175,7 @@ class _SplashScreenState extends State<SplashScreen>
                               const SizedBox(width: 8),
                               Text(
                                 '${_pingMs}ms',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: FmsTheme.emeraldGreen,
                                   fontSize: 10,
                                   fontFamily: 'monospace',

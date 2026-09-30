@@ -282,14 +282,14 @@ class LiveCabinCommsService extends ChangeNotifier {
       status = 'Berbicara ke ruang kontrol';
       notifyListeners();
       _micSubscription = stream.listen((bytes) {
-        if (speaking && connected && bytes.isNotEmpty && bytes.length <= 8192) {
+        if (speaking && connected && bytes.isNotEmpty) {
           _channel?.sink.add(bytes);
         }
       });
-    } catch (_) {
+    } catch (e) {
       requestingMic = false;
       _channel?.sink.add('{"type":"ptt_stop"}');
-      status = 'Mikrofon tidak dapat dibuka';
+      status = 'Mikrofon tidak dapat dibuka: $e';
       notifyListeners();
     }
   }

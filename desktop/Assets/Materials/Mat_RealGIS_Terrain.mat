@@ -33,7 +33,7 @@ Material:
     - _ContourInterval: 10
     - _ContourOpacity: 0.85
     - _ContourPixelWidth: 1.2
-    - _EnableContours: 0
+    - _EnableContours: 1
     - _EnableElevationHeatmap: 0
     - _HeatmapAlpha: 0.4
     - _MajorContourFreq: 5

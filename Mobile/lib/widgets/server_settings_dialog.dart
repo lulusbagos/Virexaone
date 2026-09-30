@@ -54,7 +54,7 @@ class _ServerSettingsDialogState extends State<ServerSettingsDialog> {
                 ),
               ],
             ),
-            const Divider(color: FmsTheme.cardBorder),
+            Divider(color: FmsTheme.cardBorder),
             const SizedBox(height: 12),
 
             Text("Alamat API FMS", style: FmsTheme.caption),
@@ -73,15 +73,15 @@ class _ServerSettingsDialogState extends State<ServerSettingsDialog> {
                 hintStyle: FmsTheme.caption,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: FmsTheme.cardBorder),
+                  borderSide: BorderSide(color: FmsTheme.cardBorder),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: FmsTheme.cardBorder),
+                  borderSide: BorderSide(color: FmsTheme.cardBorder),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
+                  borderSide: BorderSide(
                     color: FmsTheme.emeraldGreen,
                     width: 1.5,
                   ),

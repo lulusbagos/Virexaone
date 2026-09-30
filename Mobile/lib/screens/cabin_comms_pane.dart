@@ -340,8 +340,8 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
               refresh();
             },
             borderRadius: BorderRadius.circular(4),
-            child: const Padding(
-              padding: EdgeInsets.all(3),
+            child: Padding(
+              padding: const EdgeInsets.all(3),
               child: Icon(Icons.refresh, size: 16, color: FmsTheme.cyanAccent),
             ),
           ),
@@ -494,7 +494,7 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
                   const SizedBox(width: 4),
                   Text(
                     preset['label'],
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 9.5,
                       fontWeight: FontWeight.w700,
                       color: FmsTheme.cyanAccent,
@@ -531,15 +531,15 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
                 fillColor: const Color(0xFF08192C),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: FmsTheme.cardBorder),
+                  borderSide: BorderSide(color: FmsTheme.cardBorder),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: FmsTheme.cardBorder),
+                  borderSide: BorderSide(color: FmsTheme.cardBorder),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: FmsTheme.cyanAccent, width: 1.5),
+                  borderSide: BorderSide(color: FmsTheme.cyanAccent, width: 1.5),
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               ),
@@ -559,7 +559,7 @@ class _CabinCommsPaneState extends State<CabinCommsPane>
               padding: EdgeInsets.zero,
             ),
             child: busy
-                ? const SizedBox(
+                ? SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2, color: FmsTheme.bgDark),

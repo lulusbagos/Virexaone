@@ -37,17 +37,13 @@ class FleetUnit {
   final String? assignedShovelName;
 
   bool get hasGpsPosition =>
-      latitude != null &&
-      longitude != null &&
       easting.isFinite &&
       northing.isFinite &&
       easting > 0 &&
       northing > 0;
-  bool get hasFreshGps =>
-      hasGpsPosition && lastHeardSecondsAgo >= 0 && lastHeardSecondsAgo <= 120;
+  bool get hasFreshGps => hasGpsPosition;
   bool get hasNavigationHeading =>
       hasFreshGps &&
-      headingAvailable &&
       headingDeg.isFinite &&
       headingDeg >= 0 &&
       headingDeg <= 360;

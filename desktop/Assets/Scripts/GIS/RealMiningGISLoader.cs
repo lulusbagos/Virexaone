@@ -4,6 +4,7 @@ using UnityEngine;
 
 namespace Virexa.FMS
 {
+    [DefaultExecutionOrder(-100)]
     [ExecuteAlways]
     public class RealMiningGISLoader : MonoBehaviour
     {
@@ -117,6 +118,19 @@ namespace Virexa.FMS
                 terrainLayer = UnityEditor.AssetDatabase.LoadAssetAtPath<TerrainLayer>("Assets/Materials/Layer_PitUnggul_TIF.terrainlayer");
             }
 #endif
+            if (geotiffTexture == null)
+            {
+                geotiffTexture = Resources.Load<Texture2D>("Textures/PitUnggul_TIF_Texture")
+                              ?? Resources.Load<Texture2D>("Textures/geotiff_ortho_4k");
+            }
+
+            if (terrainMaterial == null)
+            {
+                Shader shader = Shader.Find("Virexa/TerrainContourShader")
+                             ?? Shader.Find("Virexa/GeoTIFF_Terrain_DoubleSided")
+                             ?? Shader.Find("Standard");
+                terrainMaterial = new Material(shader) { name = "Mat_RealGIS_Terrain_Runtime" };
+            }
         }
 
         private float[,] LoadHeightmapArray(int res)
@@ -177,6 +191,18 @@ namespace Virexa.FMS
                 if (geotiffTexture != null && terrainMaterial.HasProperty("_MainTex"))
                 {
                     terrainMaterial.SetTexture("_MainTex", geotiffTexture);
+                }
+                if (terrainMaterial.HasProperty("_EnableContours"))
+                {
+                    terrainMaterial.SetFloat("_EnableContours", 1.0f);
+                }
+                if (terrainMaterial.HasProperty("_ContourInterval"))
+                {
+                    terrainMaterial.SetFloat("_ContourInterval", 10.0f);
+                }
+                if (terrainMaterial.HasProperty("_ContourOpacity"))
+                {
+                    terrainMaterial.SetFloat("_ContourOpacity", 0.85f);
                 }
                 terrainMaterial.SetFloat("_TextureBrightness", 1.0f);
                 terrainMaterial.SetFloat("_TextureContrast", 0.0f);

@@ -15,6 +15,10 @@ class NearbyVehicle {
   final String unitName, unitType;
   final double lateralOffsetMeters, forwardOffsetMeters, distanceMeters;
   final bool isCollisionWarning;
+  final double? headingDeg;
+  final double? speedKmh;
+  final String? activityName;
+
   NearbyVehicle({
     required this.unitName,
     required this.unitType,
@@ -22,6 +26,9 @@ class NearbyVehicle {
     required this.forwardOffsetMeters,
     required this.distanceMeters,
     this.isCollisionWarning = false,
+    this.headingDeg,
+    this.speedKmh,
+    this.activityName,
   });
 }
 
@@ -139,9 +146,8 @@ class FmsApiService extends ChangeNotifier {
   bool get hasUnitGpsFix =>
       isApiConnected &&
       lastApiSyncTime != null &&
-      DateTime.now().difference(lastApiSyncTime!).inSeconds <= 25 &&
-      selectedUnit?.hasFreshGps == true &&
-      selectedUnit!.lastHeardSecondsAgo <= 45;
+      DateTime.now().difference(lastApiSyncTime!).inSeconds <= 60 &&
+      selectedUnit?.hasFreshGps == true;
   bool get hasLiveNavigationFix =>
       hasUnitGpsFix &&
       selectedUnit?.hasNavigationHeading == true &&
@@ -252,8 +258,8 @@ class FmsApiService extends ChangeNotifier {
     _syncing = true;
     try {
       final fleet = await _get('/api/v1/fleet/live');
-      if (fleet['status'] != 'success' || fleet['feed_stale'] == true) {
-        throw const FormatException('Feed GPS tidak tersedia atau lama');
+      if (fleet['status'] != 'success' && fleet['status'] != 'degraded') {
+        throw const FormatException('Feed GPS tidak tersedia');
       }
       final units = _rows(fleet['data']).map(FleetUnit.fromJson).toList();
       allUnits = units;
@@ -279,22 +285,22 @@ class FmsApiService extends ChangeNotifier {
           if (error is! FmsHttpException || error.statusCode != 404) rethrow;
           locations = await _get('/api/v1/locations/all');
         }
-        final fresh = units.where((unit) => unit.hasFreshGps).toList();
-        final eastings = fresh.map((unit) => unit.easting).toList()..sort();
-        final northings = fresh.map((unit) => unit.northing).toList()..sort();
+        final valid = units.where((unit) => unit.hasGpsPosition).toList();
+        final eastings = valid.map((unit) => unit.easting).toList()..sort();
+        final northings = valid.map((unit) => unit.northing).toList()..sort();
         final centerE = eastings.isEmpty ? 0.0 : eastings[eastings.length ~/ 2];
         final centerN = northings.isEmpty
             ? 0.0
             : northings[northings.length ~/ 2];
-        miningLocations = locations['status'] == 'success' && fresh.isNotEmpty
+        miningLocations = locations['status'] == 'success' && valid.isNotEmpty
             ? _rows(locations['data'])
                   .map(MiningLocation.fromJson)
                   .where(
                     (location) =>
                         location.easting.isFinite &&
                         location.northing.isFinite &&
-                        (location.easting - centerE).abs() <= 40000 &&
-                        (location.northing - centerN).abs() <= 40000,
+                        (location.easting - centerE).abs() <= 60000 &&
+                        (location.northing - centerN).abs() <= 60000,
                   )
                   .toList()
             : [];
@@ -439,21 +445,12 @@ class FmsApiService extends ChangeNotifier {
   }
 
   void _appendGpsPoint(FleetUnit truck) {
-    final recorded = DateTime.tryParse(truck.lastHeard ?? '')?.toUtc();
-    if (recorded == null ||
-        recorded.isAfter(
-          DateTime.now().toUtc().add(const Duration(seconds: 5)),
-        )) {
-      return;
-    }
-    if (_gpsTrack.isNotEmpty && !recorded.isAfter(_gpsTrack.last.recordedAt)) {
+    if (!truck.hasGpsPosition) return;
+    final recorded = DateTime.tryParse(truck.lastHeard ?? '')?.toUtc() ?? DateTime.now().toUtc();
+    if (_gpsTrack.isNotEmpty && _gpsTrack.last.easting == truck.easting && _gpsTrack.last.northing == truck.northing) {
       return;
     }
     _gpsTrack.add(CabinGpsPoint(truck.easting, truck.northing, recorded));
-    _gpsTrack.removeWhere(
-      (point) =>
-          recorded.difference(point.recordedAt) > const Duration(minutes: 10),
-    );
     if (_gpsTrack.length > 72) _gpsTrack.removeRange(0, _gpsTrack.length - 72);
   }
 
@@ -470,8 +467,7 @@ class FmsApiService extends ChangeNotifier {
     final sourceIsLive =
         isApiConnected &&
         truck != null &&
-        truck.hasNavigationHeading &&
-        truck.lastHeardSecondsAgo <= 45;
+        truck.hasNavigationHeading;
     if (!sourceIsLive) {
       hdLatitude = sample.latitude;
       hdLongitude = sample.longitude;
@@ -521,13 +517,13 @@ class FmsApiService extends ChangeNotifier {
       apiStatusMessage = 'Pilih unit dari armada API';
       return;
     }
-    if (!truck.hasFreshGps) {
+    if (!truck.hasGpsPosition) {
       apiStatusMessage =
-          'GPS ${truck.unitName} lama (${truck.lastHeardSecondsAgo}s)';
+          'Koordinat GPS ${truck.unitName} belum valid';
       return;
     }
-    hdLatitude = truck.latitude!;
-    hdLongitude = truck.longitude!;
+    hdLatitude = truck.latitude ?? 0;
+    hdLongitude = truck.longitude ?? 0;
     hdEasting = truck.easting;
     hdNorthing = truck.northing;
     hdElevation = truck.elevation;
@@ -637,44 +633,61 @@ class FmsApiService extends ChangeNotifier {
   }
 
   void _updateProximityRadar() {
-    if (!hasLiveNavigationFix) {
+    final truck = selectedUnit;
+    if (truck == null || !truck.hasFreshGps) {
       nearbyVehicles = [];
       return;
     }
-    final seen = <int>{selectedUnit!.unitId};
+    final seen = <int>{truck.unitId};
     final vehicles = <NearbyVehicle>[];
     for (final unit in allUnits) {
       if (!unit.hasFreshGps ||
-          unit.lastHeardSecondsAgo > 45 ||
-          (activeTargetType.startsWith('Excavator') &&
-              unit.unitName == activeTargetName) ||
+          unit.lastHeardSecondsAgo > 60 ||
           !seen.add(unit.unitId)) {
         continue;
       }
       final dE = unit.easting - hdEasting, dN = unit.northing - hdNorthing;
       final distance = math.sqrt(dE * dE + dN * dN);
-      if (distance > 450) continue;
+      if (distance > 850) continue;
       final offset = CabinBearing.headingUpOffset(
         eastMeters: dE,
         northMeters: dN,
         headingDeg: hdHeadingDeg,
       );
+
+      final cat = unit.category.toUpperCase();
+      final name = unit.unitName.toUpperCase();
+      String uType = 'UNIT';
+      if (cat.contains('EXCAVATOR') || name.startsWith('EX')) {
+        uType = 'EX';
+      } else if (cat.contains('HAULER') || name.startsWith('HD') || name.startsWith('DT') || name.startsWith('RD')) {
+        uType = 'HD';
+      } else if (cat.contains('DOZER') || name.startsWith('DZ') || name.startsWith('BD')) {
+        uType = 'DZ';
+      } else if (cat.contains('GRADER') || name.startsWith('GD')) {
+        uType = 'GD';
+      } else if (cat.contains('SUPPORT') || cat.contains('LV') || name.startsWith('LV') || name.startsWith('SP')) {
+        uType = 'LV';
+      } else if (cat.contains('DRILL') || name.startsWith('DR')) {
+        uType = 'DR';
+      }
+
       vehicles.add(
         NearbyVehicle(
           unitName: unit.unitName,
-          unitType: unit.category == 'Excavator'
-              ? 'EX'
-              : unit.category == 'Hauler'
-              ? 'HD'
-              : 'UNIT',
+          unitType: uType,
           lateralOffsetMeters: offset.$1,
           forwardOffsetMeters: offset.$2,
           distanceMeters: distance,
+          isCollisionWarning: distance < 50.0,
+          headingDeg: unit.headingDeg,
+          speedKmh: unit.speedKmh,
+          activityName: unit.activityName,
         ),
       );
     }
     vehicles.sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
-    nearbyVehicles = vehicles.take(6).toList();
+    nearbyVehicles = vehicles.take(12).toList();
   }
 
   Future<void> _refreshWeather(FleetUnit unit) async {

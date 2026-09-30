@@ -134,7 +134,7 @@ namespace Virexa.FMS
             float baseFloorY = -180f;
             float topY = 120f;
 
-            if (activeTerrain != null)
+            if (activeTerrain != null && activeTerrain.terrainData != null)
             {
                 Vector3 tPos = activeTerrain.transform.position;
                 Vector3 tSize = activeTerrain.terrainData.size;

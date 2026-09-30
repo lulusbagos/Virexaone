@@ -337,13 +337,17 @@ class Nav3dArrowPainter extends CustomPainter {
       final vx = v.lateralOffsetMeters / 300.0;
       final vz = v.forwardOffsetMeters / 300.0;
       final pt = _project(Vec3(vx, 0.0, vz), center, scale);
-      final Color unitColor;
-      if (v.unitType == "LV") {
-        unitColor = FmsTheme.amberWarning;
+      Color unitColor;
+      if (v.isCollisionWarning || v.distanceMeters < 50.0) {
+        unitColor = const Color(0xFFFF3366);
       } else if (v.unitType == "EX") {
-        unitColor = const Color(0xFFFF007F);
+        unitColor = const Color(0xFFFF8C00);
+      } else if (v.unitType == "DZ") {
+        unitColor = const Color(0xFFFFB300);
+      } else if (v.unitType == "LV") {
+        unitColor = const Color(0xFF00FFA3);
       } else {
-        unitColor = FmsTheme.cyanAccent;
+        unitColor = const Color(0xFF00E5FF);
       }
       final pulseRadius = 11.0 + (math.sin(animPhase * 3 * math.pi) * 2.0);
       canvas.drawCircle(

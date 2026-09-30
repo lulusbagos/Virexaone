@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../theme/fms_theme.dart';
 import '../services/fms_api_service.dart';
+import '../services/fms_settings_service.dart';
 import '../widgets/nav_3d_arrow_painter.dart';
 import '../widgets/gps_track_painter.dart';
 import '../widgets/telemetry_capsule.dart';
@@ -30,7 +31,7 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
         backgroundColor: const Color(0xFF0D1B2A),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: FmsTheme.cyanAccent, width: 1.2),
+          side: BorderSide(color: FmsTheme.cyanAccent, width: 1.2),
         ),
         title: Row(
           children: [
@@ -53,7 +54,7 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('BATAL', style: TextStyle(color: FmsTheme.textMuted)),
+            child: Text('BATAL', style: TextStyle(color: FmsTheme.textMuted)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -101,11 +102,47 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
   double _azimuthFrom = 0, _azimuthTo = 0;
   bool _motionReady = false;
   final FmsApiService _api = FmsApiService();
+  final FmsSettingsService _settings = FmsSettingsService();
   Timer? _clockTimer;
   String _currentTimeStr = '';
   bool _isZenNavigationMode = false;
   int _rightDockTab = 0; // 0: Siklus Operasi, 1: Gauges & Mesin
   int _navigationMode = 1; // 0: 3D Chevron Arrow, 1: Jejak GPS
+
+  void _cycleTheme() {
+    final current = _settings.currentTheme;
+    final nextIndex = (current.index + 1) % AppThemeMode.values.length;
+    _settings.setTheme(AppThemeMode.values[nextIndex]);
+    final label = _settings.currentTheme == AppThemeMode.solarDay
+        ? '☀️ Mode Siang (Solar High-Contrast)'
+        : _settings.currentTheme == AppThemeMode.amberWarmth
+        ? '💡 Mode Amber (Anti-Lelah Mata)'
+        : _settings.currentTheme == AppThemeMode.emeraldTactical
+        ? '🎯 Mode Tactical (Aviasi Hijau)'
+        : '🌙 Mode Malam (Cyber Midnight)';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+        duration: const Duration(milliseconds: 1400),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xEE0A1828),
+      ),
+    );
+  }
+
+  void _toggleLanguage() {
+    final nextLang = _settings.currentLanguage == AppLanguage.id ? AppLanguage.en : AppLanguage.id;
+    _settings.setLanguage(nextLang);
+    final label = nextLang == AppLanguage.id ? '🇮🇩 Bahasa Indonesia' : '🇬🇧 English';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+        duration: const Duration(milliseconds: 1200),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xEE0A1828),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -337,7 +374,7 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
             const SizedBox(width: 4),
             IconButton(
               tooltip: 'Menu FMS',
-              icon: const Icon(Icons.menu_rounded, size: 20, color: FmsTheme.textLight),
+              icon: Icon(Icons.menu_rounded, size: 20, color: FmsTheme.textLight),
               onPressed: () => _openFmsMenu(),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
@@ -431,7 +468,7 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
                 ),
                 child: Text(
                   _api.pitWeather,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: FmsTheme.emeraldGreen,
                     fontSize: 9.5,
                     fontWeight: FontWeight.bold,
@@ -459,7 +496,7 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
                     fontSize: 11,
                   ),
                 ),
-                const Text(' | ', style: TextStyle(color: FmsTheme.cardBorder, fontSize: 9.5)),
+                Text(' | ', style: TextStyle(color: FmsTheme.cardBorder, fontSize: 9.5)),
                 Text('Status: ', style: FmsTheme.caption.copyWith(fontSize: 9.5)),
                 Text(
                   stateLabel,
@@ -468,7 +505,7 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
                     fontSize: 11,
                   ),
                 ),
-                const Text(' | ', style: TextStyle(color: FmsTheme.cardBorder, fontSize: 9.5)),
+                Text(' | ', style: TextStyle(color: FmsTheme.cardBorder, fontSize: 9.5)),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                   decoration: BoxDecoration(
@@ -493,14 +530,57 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
             ),
           ),
 
-          // Right Controls: Clock, Menu & Logout
+          // Right Controls: Quick Theme, Language, Clock, Menu & Logout
           Row(
             children: [
+              // 1. Quick Theme Toggle Button
               IconButton(
-                icon: const Icon(Icons.menu_rounded, size: 20, color: FmsTheme.cyanAccent),
-                tooltip: 'Menu FMS',
+                icon: Icon(
+                  _settings.currentTheme == AppThemeMode.solarDay
+                      ? Icons.wb_sunny_rounded
+                      : _settings.currentTheme == AppThemeMode.amberWarmth
+                      ? Icons.shield_moon_rounded
+                      : _settings.currentTheme == AppThemeMode.emeraldTactical
+                      ? Icons.radar_rounded
+                      : Icons.nightlight_round_rounded,
+                  size: 20,
+                  color: FmsTheme.cyanAccent,
+                ),
+                tooltip: 'Ganti Tema Siang/Malam/Amber/Taktis',
+                onPressed: _cycleTheme,
+              ),
+
+              // 2. Quick Language Switcher
+              InkWell(
+                onTap: _toggleLanguage,
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: FmsTheme.cardBg,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: FmsTheme.cardBorder),
+                  ),
+                  child: Text(
+                    _settings.currentLanguage == AppLanguage.id ? '🇮🇩 ID' : '🇬🇧 EN',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+
+              // 3. FMS Full Menu
+              IconButton(
+                icon: Icon(Icons.menu_rounded, size: 20, color: FmsTheme.cyanAccent),
+                tooltip: _settings.tr('menu_btn'),
                 onPressed: () => _openFmsMenu(),
               ),
+
+              // 4. Digital Cockpit Clock
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -519,6 +599,8 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
                 ),
               ),
               const SizedBox(width: 4),
+
+              // 5. Zen Navigation Mode Toggle
               IconButton(
                 icon: Icon(
                   _isZenNavigationMode
@@ -538,6 +620,8 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
                   });
                 },
               ),
+
+              // 6. Exit Cockpit Button
               IconButton(
                 icon: const Icon(
                   Icons.exit_to_app_rounded,
@@ -662,8 +746,8 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: FmsTheme.surfaceDark,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         side: BorderSide(color: FmsTheme.cardBorder),
       ),
       builder: (context) => Padding(
@@ -685,7 +769,7 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
                 ),
               ],
             ),
-            const Divider(color: FmsTheme.cardBorder),
+            Divider(color: FmsTheme.cardBorder),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -878,18 +962,52 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
         ? '-'
         : distMeters >= 1000
         ? '${(distMeters / 1000).toStringAsFixed(2)} KM'
-        : '${distMeters.toStringAsFixed(0)} METER';
-
-    final subTarget = _api.navigationIsHeld
-        ? '${_api.navigationHoldLabel} ${_api.displayGpsAgeSeconds ?? '-'}s | GARIS LURUS'
-        : _api.hasNavigationFix
-        ? _navigationMode == 1
-              ? 'JEJAK GPS 10 MENIT | GARIS LURUS KE ${_api.activeTargetName}'
-              : 'GARIS LURUS KE ${_api.activeTargetName}'
-        : _api.relativeDirectionLabel;
+        : '${distMeters.toStringAsFixed(0)} M';
 
     final hdgText = _api.hdHeadingDeg.toStringAsFixed(0).padLeft(3, '0');
     final azText = _api.absoluteTargetAzimuth.toStringAsFixed(0).padLeft(3, '0');
+    final speedText = _api.hdSpeedKmh.toStringAsFixed(0);
+
+    // Maneuver Icon and text determination
+    IconData maneuverIcon = Icons.navigation;
+    String maneuverText = 'LURUS';
+    Color maneuverColor = FmsTheme.emeraldGreen;
+
+    if (_api.hasNavigationFix) {
+      if (distMeters > 0 && distMeters <= 35) {
+        maneuverIcon = Icons.stars_rounded;
+        maneuverText = 'TIBA DI TARGET';
+        maneuverColor = FmsTheme.cyanAccent;
+      } else {
+        final rb = _api.relativeBearingDegrees;
+        if (rb.abs() <= 12) {
+          maneuverIcon = Icons.arrow_upward_rounded;
+          maneuverText = 'TERUS LURUS';
+          maneuverColor = FmsTheme.emeraldGreen;
+        } else if (rb > 12 && rb <= 50) {
+          maneuverIcon = Icons.turn_right_rounded;
+          maneuverText = 'KANAN ${rb.round()}°';
+          maneuverColor = const Color(0xFF00E5FF);
+        } else if (rb > 50) {
+          maneuverIcon = Icons.u_turn_right_rounded;
+          maneuverText = 'PUTAR KANAN ${rb.round()}°';
+          maneuverColor = FmsTheme.amberWarning;
+        } else if (rb < -12 && rb >= -50) {
+          maneuverIcon = Icons.turn_left_rounded;
+          maneuverText = 'KIRI ${rb.abs().round()}°';
+          maneuverColor = const Color(0xFF00E5FF);
+        } else {
+          maneuverIcon = Icons.u_turn_left_rounded;
+          maneuverText = 'PUTAR KIRI ${rb.abs().round()}°';
+          maneuverColor = FmsTheme.amberWarning;
+        }
+      }
+    }
+
+    // Check collision hazard from nearby fleet (<50m)
+    final criticalHazardUnit = _api.nearbyVehicles.where(
+      (u) => u.isCollisionWarning || u.distanceMeters < 50.0,
+    ).firstOrNull;
 
     return Container(
       decoration: BoxDecoration(
@@ -899,9 +1017,9 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
       ),
       child: Stack(
         children: [
-          // 3D Canvas
+          // 1. Navigation Viewport Canvas (3D Chevron / Tactical Radar)
           Positioned.fill(
-            top: isCompact ? 48 : 52,
+            top: isCompact ? 54 : 58,
             bottom: isCompact ? 72 : 82,
             child: _api.hasNavigationFix
                 ? AnimatedBuilder(
@@ -912,7 +1030,7 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
                     ]),
                     builder: (context, child) {
                       return Opacity(
-                        opacity: _api.navigationIsHeld ? 0.75 : 1.0,
+                        opacity: _api.navigationIsHeld ? 0.78 : 1.0,
                         child: CustomPaint(
                           painter: _navigationMode == 0
                               ? Nav3dArrowPainter(
@@ -939,6 +1057,7 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
                                   targetNorthing: _api.targetNorthing,
                                   targetName: _api.activeTargetName,
                                   held: _api.navigationIsHeld,
+                                  animPhase: _animController.value,
                                 ),
                         ),
                       );
@@ -963,164 +1082,288 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
                   ),
           ),
 
-          // Top Right: Mode Switcher (Panah / Jejak)
+          // 2. High-Tech Turn-by-Turn Maneuver Header Bar
           Positioned(
-            top: 8,
+            top: 6,
+            left: 8,
             right: 8,
-            child: SegmentedButton<int>(
-              segments: const [
-                ButtonSegment(value: 0, label: Text('Panah 3D')),
-                ButtonSegment(value: 1, label: Text('Jejak GPS')),
-              ],
-              selected: {_navigationMode},
-              showSelectedIcon: false,
-              onSelectionChanged: (selected) =>
-                  setState(() => _navigationMode = selected.first),
-              style: ButtonStyle(
-                visualDensity: VisualDensity.compact,
-                textStyle: const WidgetStatePropertyAll(
-                  TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: FmsTheme.cardHeaderBg.withValues(alpha: 0.94),
+                borderRadius: BorderRadius.circular(9),
+                border: Border.all(
+                  color: maneuverColor.withValues(alpha: 0.60),
+                  width: 1.1,
                 ),
-                padding: const WidgetStatePropertyAll(
-                  EdgeInsets.symmetric(horizontal: 6),
-                ),
-                minimumSize: const WidgetStatePropertyAll(Size(36, 26)),
+                boxShadow: [
+                  BoxShadow(
+                    color: maneuverColor.withValues(alpha: 0.20),
+                    blurRadius: 10,
+                    spreadRadius: -2,
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  // Maneuver Icon
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: maneuverColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(7),
+                      border: Border.all(
+                        color: maneuverColor.withValues(alpha: 0.80),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Icon(
+                      maneuverIcon,
+                      color: maneuverColor,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Destination & Maneuver Text
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              maneuverText,
+                              style: TextStyle(
+                                color: maneuverColor,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                '• ${_api.activeTargetName}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFFF1FAFA),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          'JARAK: $distText | ETA ${_api.estimatedEtaMinutes > 0 ? '${_api.estimatedEtaMinutes.toStringAsFixed(1)}m' : '--'} | AZ $azText° | HDG $hdgText°',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: FmsTheme.cyanAccent.withValues(alpha: 0.85),
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Speed Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF030910),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: FmsTheme.cyanAccent.withValues(alpha: 0.6),
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          speedText,
+                          style: const TextStyle(
+                            color: Color(0xFF00FFA3),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            height: 1.0,
+                          ),
+                        ),
+                        const Text(
+                          'KM/H',
+                          style: TextStyle(
+                            color: Color(0xFF80DEEA),
+                            fontSize: 7,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+
+                  // Navigation Mode Switcher Segment
+                  SegmentedButton<int>(
+                    segments: const [
+                      ButtonSegment(
+                        value: 0,
+                        icon: Icon(Icons.navigation_outlined, size: 13),
+                        label: Text('3D HUD'),
+                      ),
+                      ButtonSegment(
+                        value: 1,
+                        icon: Icon(Icons.radar, size: 13),
+                        label: Text('Radar Map'),
+                      ),
+                    ],
+                    selected: {_navigationMode},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (selected) =>
+                        setState(() => _navigationMode = selected.first),
+                    style: ButtonStyle(
+                      visualDensity: VisualDensity.compact,
+                      textStyle: const WidgetStatePropertyAll(
+                        TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold),
+                      ),
+                      padding: const WidgetStatePropertyAll(
+                        EdgeInsets.symmetric(horizontal: 5),
+                      ),
+                      minimumSize: const WidgetStatePropertyAll(Size(30, 24)),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
 
-          // Top Center: Floating Target Distance Badge
-          Positioned(
-            top: 6,
-            left: isCompact ? 54 : 10,
-            right: isCompact ? 116 : 140,
-            child: Align(
-              alignment: Alignment.topCenter,
+          // 3. Proximity Hazard Collision Banner (<50m alert)
+          if (criticalHazardUnit != null)
+            Positioned(
+              top: isCompact ? 58 : 64,
+              left: 12,
+              right: 12,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: FmsTheme.cardHeaderBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: FmsTheme.cyanAccent.withValues(alpha: 0.7),
-                    width: 1.2,
-                  ),
-                  boxShadow: FmsTheme.neonGlowShadow(
-                    FmsTheme.emeraldGreen,
-                    opacity: 0.25,
-                    blur: 10,
-                  ),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '📍 $distText',
-                      style: FmsTheme.displayMedium.copyWith(
-                        color: _api.navigationIsHeld
-                            ? FmsTheme.amberWarning
-                            : FmsTheme.emeraldGreen,
-                        fontSize: isCompact ? 14 : 16,
-                      ),
+                  color: const Color(0xE83D0612),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFFF3366), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFF3366).withValues(alpha: 0.35),
+                      blurRadius: 8,
                     ),
-                    Text(
-                      subTarget,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: FmsTheme.caption.copyWith(
-                        color: FmsTheme.cyanAccent,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 8.5,
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Color(0xFFFF3366), size: 16),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'PERINGATAN PROKSIMITAS: ${criticalHazardUnit.unitName} (${criticalHazardUnit.distanceMeters.round()}m) Berada di Zona Bahaya!',
+                        style: const TextStyle(
+                          color: Color(0xFFFFE4E8),
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-          ),
 
-          // Bottom Left: CAS Radar Badge
+          // 4. Surrounding Fleet Radar Ticker (Bottom-left HUD)
           Positioned(
-            bottom: isCompact ? 52 : 62,
+            bottom: isCompact ? 48 : 54,
             left: 8,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xEC040F1D),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: FmsTheme.amberWarning.withValues(alpha: 0.7),
-                  width: 1.0,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'GPS SEKITAR: ',
-                    style: TextStyle(
-                      color: FmsTheme.amberWarning,
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    _api.hasLiveNavigationFix
-                        ? '${_api.nearbyVehicles.length} UNIT'
-                        : '--',
-                    style: FmsTheme.caption.copyWith(
-                      color: FmsTheme.emeraldGreen,
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Bottom Right: Heading & Relative Bearing
-          Positioned(
-            bottom: isCompact ? 52 : 62,
             right: 8,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              height: 22,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
               decoration: BoxDecoration(
-                color: FmsTheme.cardHeaderBg,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: FmsTheme.cardBorder),
+                color: const Color(0xDC040E19),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFF0F3E50)),
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
+                  Icon(
+                    Icons.radar,
+                    size: 12,
+                    color: _api.nearbyVehicles.isNotEmpty
+                        ? const Color(0xFF00FFA3)
+                        : const Color(0xFF80DEEA),
+                  ),
+                  const SizedBox(width: 4),
                   Text(
-                    'HDG: ${_api.hasNavigationFix ? '$hdgText°' : '-'} | ',
-                    style: FmsTheme.codePill.copyWith(
-                      color: FmsTheme.textLight,
-                      fontSize: 9.0,
+                    'ARMADA SEKITAR (${_api.nearbyVehicles.length}): ',
+                    style: const TextStyle(
+                      color: Color(0xFF80DEEA),
+                      fontSize: 8.0,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  Text(
-                    'AZ: ${_api.hasNavigationFix ? '$azText°' : '-'} | ',
-                    style: FmsTheme.codePill.copyWith(
-                      color: FmsTheme.cyanAccent,
-                      fontSize: 9.0,
+                  if (_api.nearbyVehicles.isEmpty)
+                    const Text(
+                      'Tidak ada unit dalam jangkauan radar',
+                      style: TextStyle(
+                        color: Color(0xFF547B8C),
+                        fontSize: 8.0,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _api.nearbyVehicles.length,
+                        separatorBuilder: (context, index) => const SizedBox(width: 6),
+                        itemBuilder: (context, idx) {
+                          final v = _api.nearbyVehicles[idx];
+                          final isDanger = v.isCollisionWarning || v.distanceMeters < 50.0;
+                          final c = isDanger
+                              ? const Color(0xFFFF3366)
+                              : v.unitType == 'EX'
+                              ? const Color(0xFFFF8C00)
+                              : v.unitType == 'DZ'
+                              ? const Color(0xFFFFB300)
+                              : const Color(0xFF00E5FF);
+
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: c.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(3),
+                              border: Border.all(color: c.withValues(alpha: 0.6), width: 0.8),
+                            ),
+                            child: Text(
+                              '${v.unitName} ${v.distanceMeters.round()}m',
+                              style: TextStyle(
+                                color: c,
+                                fontSize: 8.0,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                  Text(
-                    _api.relativeDirectionLabel,
-                    style: FmsTheme.codePill.copyWith(
-                      color: FmsTheme.emeraldGreen,
-                      fontSize: 9.0,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
                 ],
               ),
             ),
           ),
 
-          // Bottom Viewport Target Strip
+          // 5. Bottom Target Control Bar
           Positioned(
             bottom: 4,
             left: 6,
@@ -1144,7 +1387,7 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
                           children: [
                             Flexible(
                               child: Text(
-                                'TARGET: ${_api.activeTargetName}',
+                                'TUJUAN: ${_api.activeTargetName}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: FmsTheme.titleMedium.copyWith(
@@ -1164,18 +1407,19 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
                                 !_api.hasTarget
                                     ? 'BELUM ADA'
                                     : _api.isManualTargetOverride
-                                    ? 'DIPILIH'
-                                    : 'ASSIGNMENT',
+                                    ? 'MANUAL'
+                                    : 'DISPATCH',
                                 style: FmsTheme.caption.copyWith(
                                   color: FmsTheme.emeraldGreen,
                                   fontSize: 7.5,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
                           ],
                         ),
                         Text(
-                          '${_api.activeTargetType} | Jarak: $distText${_api.estimatedEtaMinutes > 0 ? ' | Est. ${_api.estimatedEtaMinutes.toStringAsFixed(1)}m' : ''}',
+                          '${_api.activeTargetType} | Sisa: $distText${_api.estimatedEtaMinutes > 0 ? ' | Est: ${_api.estimatedEtaMinutes.toStringAsFixed(1)}m' : ''}',
                           style: FmsTheme.caption.copyWith(
                             color: FmsTheme.cyanAccent,
                             fontSize: 8.5,
@@ -1185,7 +1429,7 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
                       ],
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 6),
                   ElevatedButton.icon(
                     onPressed: () {
                       showDialog(
@@ -1308,7 +1552,7 @@ class _CabinDashboardScreenState extends State<CabinDashboardScreen>
                             fontSize: 10.5,
                           ),
                         ),
-                        const Divider(color: FmsTheme.cardBorder, height: 18),
+                        Divider(color: FmsTheme.cardBorder, height: 18),
                         Text('GPS UNIT', style: FmsTheme.caption),
                         const SizedBox(height: 4),
                         Text(

@@ -5,18 +5,19 @@ class TelemetryCapsule extends StatelessWidget {
   final String icon;
   final String label;
   final String value;
-  final Color valueColor;
+  final Color? valueColor;
 
   const TelemetryCapsule({
     super.key,
     required this.icon,
     required this.label,
     required this.value,
-    this.valueColor = FmsTheme.emeraldGreen,
+    this.valueColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final activeValueColor = valueColor ?? FmsTheme.emeraldGreen;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
@@ -47,7 +48,7 @@ class TelemetryCapsule extends StatelessWidget {
                 value,
                 maxLines: 1,
                 style: FmsTheme.titleMedium.copyWith(
-                  color: valueColor,
+                  color: activeValueColor,
                   fontWeight: FontWeight.w800,
                   fontSize: 10.0,
                 ),

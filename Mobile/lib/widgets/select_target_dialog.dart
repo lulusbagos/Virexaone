@@ -66,7 +66,7 @@ class _SelectTargetDialogState extends State<SelectTargetDialog>
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.close,
                     color: FmsTheme.textMuted,
                     size: 18,

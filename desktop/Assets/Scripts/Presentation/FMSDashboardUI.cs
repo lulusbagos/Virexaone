@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 
 namespace Virexa.FMS
@@ -384,6 +385,8 @@ namespace Virexa.FMS
         {
             if (Instance == null) { Instance = this; Application.runInBackground = true; }
             else Destroy(gameObject);
+
+            EnsureMineTerrain();
         }
 
         private void Start()
@@ -394,6 +397,7 @@ namespace Virexa.FMS
             LoadTagSettings();
             LoadWeatherReport();
             StartCoroutine(CheckApiHealthLoop());
+            EnsureMineTerrain();
             EnsureMining3DLayer();
             EnsureUnitAssetManager();
             EnsureMeasureTool();
@@ -409,6 +413,50 @@ namespace Virexa.FMS
             EnsureFleetMessenger();
             if (FMSWeatherController.Instance == null) gameObject.AddComponent<FMSWeatherController>();
             FMSFleetMessenger.OnNotificationRequested = (msg) => ShowNotification(msg);
+        }
+
+        public void EnsureMineTerrain()
+        {
+            Terrain t = Terrain.activeTerrain ?? FindFirstObjectByType<Terrain>();
+            if (t == null || t.terrainData == null)
+            {
+                if (RealMiningGISLoader.Instance != null)
+                {
+                    RealMiningGISLoader.Instance.BuildRealGISTerrain();
+                }
+                else
+                {
+                    var existing = FindFirstObjectByType<RealMiningGISLoader>();
+                    if (existing != null)
+                    {
+                        existing.BuildRealGISTerrain();
+                    }
+                    else
+                    {
+                        var gisObj = new GameObject("--- GIS_TERRAIN_MANAGER ---");
+                        var loader = gisObj.AddComponent<RealMiningGISLoader>();
+                        loader.BuildRealGISTerrain();
+                    }
+                }
+            }
+
+            if (MineTerrainLoader.Instance == null)
+            {
+                var existingMine = FindFirstObjectByType<MineTerrainLoader>();
+                if (existingMine != null)
+                {
+                    existingMine.BuildTerrain();
+                }
+                else
+                {
+                    var terrainObj = GameObject.Find("RealMining_Terrain_GIS") ?? GameObject.Find("3D_Mine_Terrain");
+                    if (terrainObj != null)
+                    {
+                        var ml = terrainObj.GetComponent<MineTerrainLoader>() ?? terrainObj.AddComponent<MineTerrainLoader>();
+                        ml.BuildTerrain();
+                    }
+                }
+            }
         }
 
         public void EnsureFleetMessenger()
@@ -1324,8 +1372,26 @@ namespace Virexa.FMS
                 cursorUtmInfo = $"E: {lastEasting:F1} m | N: {lastNorthing:F1} m | Elev: {lastElevation:F1} m";
             }
 
-            // Keyboard Shortcuts (disabled if modal or textfield is active)
-            if (!IsBlockingModalOpen() && GUIUtility.keyboardControl == 0)
+            // Global Textfield Focus Detection
+            bool isTyping = IsAnyTextInputActive || IsBlockingModalOpen();
+
+            // [Ctrl + F], [F3], [Ctrl + K], or [/] Toggle Unit Search & Command Palette (Always responsive)
+            if (!isTyping && Input.GetKeyDown(KeyCode.Slash) ||
+                Input.GetKeyDown(KeyCode.F3) ||
+                ((Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) && (Input.GetKeyDown(KeyCode.F) || Input.GetKeyDown(KeyCode.K))))
+            {
+                showCommandPalette = !showCommandPalette;
+                if (showCommandPalette)
+                {
+                    commandPaletteQuery = "";
+                    focusCommandInputFrames = 5;
+                    currentMenu = ActiveMenu.None;
+                    ShowNotification("🔍 Cari Unit Tambang, Lokasi, atau Jalan (Ketik Kode Unit / Nama / Opr)");
+                }
+            }
+
+            // Keyboard Shortcuts (STRICTLY disabled when user is typing in a search box, chat field, or modal)
+            if (!isTyping)
             {
                 // [U] Toggle Fleet Units
                 if (Input.GetKeyDown(KeyCode.U))
@@ -1401,18 +1467,7 @@ namespace Virexa.FMS
                     }
                 }
 
-                // [Ctrl + F], [F3], [Ctrl + K] Toggle Unit Search & Command Palette
-                if (Input.GetKeyDown(KeyCode.F3) ||
-                    ((Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) && (Input.GetKeyDown(KeyCode.F) || Input.GetKeyDown(KeyCode.K))))
-                {
-                    showCommandPalette = !showCommandPalette;
-                    if (showCommandPalette)
-                    {
-                        commandPaletteQuery = "";
-                        focusCommandInputFrames = 3;
-                        ShowNotification("🔍 Cari Unit Tambang, Lokasi, atau Jalan (Ketik Kode Unit / Nama / Opr)");
-                    }
-                }
+
 
                 // [Ctrl + D] or [D] Toggle Drone Inspection Tour
                 if (Input.GetKeyDown(KeyCode.D))
@@ -1506,6 +1561,7 @@ namespace Virexa.FMS
                 if (Input.GetKeyDown(KeyCode.F9) || Input.GetKeyDown(KeyCode.C))
                 {
                     showDispatchRadioModal = !showDispatchRadioModal;
+                    if (showDispatchRadioModal) focusRadioChatFrames = 5;
                     ShowNotification(showDispatchRadioModal ? "📻 Radio Komunikasi Dispatch Dibuka" : "📻 Radio Komunikasi Ditutup");
                 }
 
@@ -1892,22 +1948,7 @@ namespace Virexa.FMS
             helpBtnX = curX;
             curX = DrawMenuButton("Bantuan", ActiveMenu.Help, curX, 70);
 
-            // GROUP 4: QUICK SEARCH BUTTON IN TOP NAV
-            if (w >= 900f)
-            {
-                float searchBtnW = compactNav ? 115f : 165f;
-                string searchLabel = compactNav ? "🔍 Cari [Ctrl+F]" : "🔍 Cari Unit / Lokasi [Ctrl+F]";
-                if (GUI.Button(new Rect(curX, 8, searchBtnW, 28), searchLabel, showCommandPalette ? navBtnActiveStyle : navBtnStyle))
-                {
-                    showCommandPalette = !showCommandPalette;
-                    if (showCommandPalette)
-                    {
-                        commandPaletteQuery = "";
-                        focusCommandInputFrames = 3;
-                    }
-                }
-                curX += searchBtnW + 8f;
-            }
+
 
             // Center: Coordinate HUD
             bool narrowNav = w < 950f;
@@ -2371,14 +2412,25 @@ namespace Virexa.FMS
 
                 if (!string.IsNullOrEmpty(selectedFile))
                 {
-                    if (RealMiningGISLoader.Instance == null)
+                    var gisLoader = RealMiningGISLoader.Instance ?? FindFirstObjectByType<RealMiningGISLoader>();
+                    var mineLoader = MineTerrainLoader.Instance ?? FindFirstObjectByType<MineTerrainLoader>();
+
+                    if (gisLoader == null && mineLoader == null)
                     {
-                        ShowNotification("Layer terrain belum tersedia.");
+                        GameObject tRoot = new GameObject("--- FMS_MINE_TERRAIN ---");
+                        mineLoader = tRoot.AddComponent<MineTerrainLoader>();
+                        mineLoader.BuildTerrain();
                     }
-                    else
+
+                    if (gisLoader != null)
                     {
-                        bool applied = RealMiningGISLoader.Instance.LoadAndApplyGeoTIFFFromFile(selectedFile, out string msg);
+                        bool applied = gisLoader.LoadAndApplyGeoTIFFFromFile(selectedFile, out string msg);
                         ShowNotification($"{(applied ? "✅" : "⚠️")} {msg}");
+                    }
+                    else if (mineLoader != null)
+                    {
+                        mineLoader.BuildTerrain();
+                        ShowNotification("✅ Citra satelit 3D Terrain berhasil diperbarui!");
                     }
                 }
             }
@@ -2389,12 +2441,10 @@ namespace Virexa.FMS
                 Application.platform == RuntimePlatform.WindowsPlayer;
             if (canOpenFolder && GUI.Button(new Rect(x + 6, itemY, w - 12, itemH), "📁 Buka folder citra...", dropdownItemStyle))
             {
-                if (RealMiningGISLoader.Instance != null)
-                {
-                    RealMiningGISLoader.Instance.OpenGeoTIFFFolderInExplorer();
-                    ShowNotification("Folder citra dibuka di Explorer.");
-                }
-                else ShowNotification("Layer terrain belum tersedia.");
+                string folderPath = Path.Combine(Application.dataPath, "Textures");
+                if (!Directory.Exists(folderPath)) Directory.CreateDirectory(folderPath);
+                System.Diagnostics.Process.Start("explorer.exe", folderPath.Replace("/", "\\"));
+                ShowNotification("Folder citra dibuka di Explorer.");
                 currentMenu = ActiveMenu.None;
             }
             if (canOpenFolder) itemY += spacing;
@@ -2427,12 +2477,26 @@ namespace Virexa.FMS
 
             if (GUI.Button(new Rect(x + 6, itemY, w - 12, itemH), "🔄 Reload Layer Terrain GeoTIFF", dropdownItemStyle))
             {
-                if (RealMiningGISLoader.Instance != null)
+                var mineLoader = MineTerrainLoader.Instance ?? FindFirstObjectByType<MineTerrainLoader>();
+                var gisLoader = RealMiningGISLoader.Instance ?? FindFirstObjectByType<RealMiningGISLoader>();
+
+                if (mineLoader != null)
                 {
-                    RealMiningGISLoader.Instance.BuildRealGISTerrain();
-                    ShowNotification("Terrain dimuat ulang.");
+                    mineLoader.BuildTerrain();
+                    ShowNotification("✅ Layer 3D Terrain & GeoTIFF berhasil dimuat ulang.");
                 }
-                else ShowNotification("Layer terrain belum tersedia.");
+                else if (gisLoader != null)
+                {
+                    gisLoader.BuildRealGISTerrain();
+                    ShowNotification("✅ Layer Terrain GIS berhasil dimuat ulang.");
+                }
+                else
+                {
+                    GameObject tRoot = new GameObject("--- FMS_MINE_TERRAIN ---");
+                    var newLoader = tRoot.AddComponent<MineTerrainLoader>();
+                    newLoader.BuildTerrain();
+                    ShowNotification("✅ Layer 3D Terrain & GeoTIFF berhasil dibuat dan diaktifkan!");
+                }
                 currentMenu = ActiveMenu.None;
             }
             itemY += spacing;
@@ -2562,6 +2626,15 @@ namespace Virexa.FMS
                     ShowNotification("Kamera dipusatkan ke pit.");
                 }
                 else ShowNotification("Pengendali kamera belum tersedia.");
+                currentMenu = ActiveMenu.None;
+            }
+            itemY += spacing;
+
+            if (GUI.Button(new Rect(x + 6, itemY, w - 12, itemH), "🔍 Cari Unit, Lokasi & Rute... [Ctrl+F]", dropdownItemStyle))
+            {
+                showCommandPalette = true;
+                commandPaletteQuery = "";
+                focusCommandInputFrames = 5;
                 currentMenu = ActiveMenu.None;
             }
             itemY += spacing;
@@ -3717,7 +3790,10 @@ namespace Virexa.FMS
                 if (focusCommandInputFrames > 0)
                 {
                     GUI.FocusControl("CommandPaletteInput");
-                    focusCommandInputFrames--;
+                    if (Event.current != null && Event.current.type == EventType.Repaint)
+                    {
+                        focusCommandInputFrames--;
+                    }
                 }
             }
             catch (System.Exception)
@@ -4339,6 +4415,18 @@ namespace Virexa.FMS
 
         public bool HasBlockingModal => IsBlockingModalOpen();
         public bool IsMapEditorOpen => fmsMapEditorPanel != null && fmsMapEditorPanel.IsOpen;
+
+        public static bool IsAnyTextInputActive
+        {
+            get
+            {
+                if (GUIUtility.keyboardControl != 0) return true;
+                string focused = GUI.GetNameOfFocusedControl();
+                if (!string.IsNullOrEmpty(focused)) return true;
+                if (Instance != null && (Instance.showCommandPalette || Instance.showDispatchRadioModal || Instance.showWeatherReportModal)) return true;
+                return false;
+            }
+        }
 
         private bool IsBlockingModalOpen()
         {
@@ -6105,6 +6193,7 @@ namespace Virexa.FMS
         // =========================================================================
         private void DrawControlRoomDispatchRadioModal(float screenW, float screenH)
         {
+            GUI.enabled = true;
             float modalW = Mathf.Min(960f, screenW - 24f);
             float modalH = Mathf.Min(640f, screenH - 24f);
             float x = (screenW - modalW) / 2f;
@@ -6200,50 +6289,42 @@ namespace Virexa.FMS
             }
             curY += 40f;
 
-            // Unit Quick Picker Sub-row when SINGLE_UNIT is selected
+            // Unit Quick Picker Sub-row when SINGLE_UNIT is selected (clean horizontal scroll chips, no search box)
             if (dispatchTargetCategory == "SINGLE_UNIT" || isSingle)
             {
-                GUI.Box(new Rect(x + 20, curY, modalW - 40, 52), GUIContent.none, dropdownPanelStyle);
-                GUI.Label(new Rect(x + 28, curY + 6, 80, 20), "🔍 Cari Unit:", hintStyle);
-                dispatchUnitSearchQuery = GUI.TextField(new Rect(x + 105, curY + 4, 130, 22), dispatchUnitSearchQuery ?? "", searchBoxStyle ?? GUI.skin.textField);
+                GUI.Box(new Rect(x + 20, curY, modalW - 40, 42), GUIContent.none, dropdownPanelStyle);
+                GUI.Label(new Rect(x + 28, curY + 10, 80, 20), "📋 <b>PILIH:</b>", hintStyle);
 
                 var fleet = FMSFleetManager.Instance != null ? FMSFleetManager.Instance.activeFleet : null;
-                List<FMSUnitController> filteredUnits = new List<FMSUnitController>();
-                string qDigits = new string(System.Array.FindAll((dispatchUnitSearchQuery ?? "").ToCharArray(), char.IsDigit));
+                List<FMSUnitController> availableUnits = new List<FMSUnitController>();
                 if (fleet != null)
                 {
                     foreach (var u in fleet)
                     {
-                        if (u == null || string.IsNullOrEmpty(u.unitId)) continue;
-                        string uDigits = new string(System.Array.FindAll(u.unitId.ToCharArray(), char.IsDigit));
-                        bool digitMatch = !string.IsNullOrEmpty(qDigits) && qDigits.Length >= 2 && uDigits.Contains(qDigits);
-
-                        if (string.IsNullOrEmpty(dispatchUnitSearchQuery) || 
-                            u.unitId.IndexOf(dispatchUnitSearchQuery, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                            digitMatch)
-                            filteredUnits.Add(u);
+                        if (u != null && !string.IsNullOrEmpty(u.unitId))
+                            availableUnits.Add(u);
                     }
                 }
 
-                float uChipW = 86f;
-                float uScrollW = modalW - 290f;
-                float uTotalW = Mathf.Max(uScrollW, filteredUnits.Count * (uChipW + 6f));
+                float uChipW = 92f;
+                float uScrollW = modalW - 150f;
+                float uTotalW = Mathf.Max(uScrollW, availableUnits.Count * (uChipW + 6f));
                 dispatchTargetScrollPos = GUI.BeginScrollView(
-                    new Rect(x + 245f, curY + 3f, uScrollW, 44f), dispatchTargetScrollPos,
-                    new Rect(0f, 0f, uTotalW, 28f));
+                    new Rect(x + 115f, curY + 4f, uScrollW, 34f), dispatchTargetScrollPos,
+                    new Rect(0f, 0f, uTotalW, 26f));
 
-                for (int i = 0; i < filteredUnits.Count; i++)
+                for (int i = 0; i < availableUnits.Count; i++)
                 {
-                    var u = filteredUnits[i];
+                    var u = availableUnits[i];
                     bool isUnitSel = dispatchSelectedUnitTarget.Equals(u.unitId, StringComparison.OrdinalIgnoreCase);
                     GUIStyle uStyle = isUnitSel ? navBtnActiveStyle : navBtnStyle;
-                    if (GUI.Button(new Rect(i * (uChipW + 6f), 2f, uChipW, 26f), u.unitId, uStyle))
+                    if (GUI.Button(new Rect(i * (uChipW + 6f), 0f, uChipW, 24f), u.unitId, uStyle))
                     {
                         dispatchSelectedUnitTarget = u.unitId;
                     }
                 }
                 GUI.EndScrollView();
-                curY += 56f;
+                curY += 46f;
             }
 
             // =========================================================================
@@ -6330,19 +6411,38 @@ namespace Virexa.FMS
                 float pttBtnW = 200f;
                 float sendBtnW = 120f;
                 float textInputW = modalW - 40 - pttBtnW - sendBtnW - 16;
+                Rect inputRect = new Rect(x + 20, curY, textInputW, 36);
 
-                GUI.Box(new Rect(x + 20, curY, textInputW, 36), GUIContent.none, dropdownPanelStyle);
+                GUIStyle chatInputStyle = new GUIStyle(GUI.skin.textField)
+                {
+                    fontSize = 13,
+                    alignment = TextAnchor.MiddleLeft,
+                    padding = new RectOffset(10, 10, 6, 6)
+                };
+                if (chatInputStyle.normal != null) { chatInputStyle.normal.textColor = Color.white; chatInputStyle.normal.background = searchInputBgTex; }
+                if (chatInputStyle.focused != null) { chatInputStyle.focused.textColor = Color.white; chatInputStyle.focused.background = searchInputBgTex; }
+                if (chatInputStyle.active != null) { chatInputStyle.active.textColor = Color.white; chatInputStyle.active.background = searchInputBgTex; }
+                if (chatInputStyle.hover != null) { chatInputStyle.hover.textColor = Color.white; chatInputStyle.hover.background = searchInputBgTex; }
+
+                if (Event.current != null && Event.current.type == EventType.MouseDown && inputRect.Contains(Event.current.mousePosition))
+                {
+                    GUI.FocusControl("DispatchChatInput");
+                }
+
                 GUI.SetNextControlName("DispatchChatInput");
-                dispatchOutgoingMessage = GUI.TextField(new Rect(x + 26, curY + 6, textInputW - 12, 24), dispatchOutgoingMessage ?? "", searchBoxStyle ?? GUI.skin.textField);
+                dispatchOutgoingMessage = GUI.TextField(inputRect, dispatchOutgoingMessage ?? "", chatInputStyle);
                 if (focusRadioChatFrames > 0)
                 {
                     GUI.FocusControl("DispatchChatInput");
-                    focusRadioChatFrames--;
+                    if (Event.current != null && Event.current.type == EventType.Repaint)
+                    {
+                        focusRadioChatFrames--;
+                    }
                 }
 
                 // Handle keyboard Enter to send
                 Event curEvent = Event.current;
-                if (curEvent != null && curEvent.type == EventType.KeyDown && curEvent.keyCode == KeyCode.Return && GUI.GetNameOfFocusedControl() != "")
+                if (curEvent != null && curEvent.type == EventType.KeyDown && curEvent.keyCode == KeyCode.Return && GUI.GetNameOfFocusedControl() == "DispatchChatInput")
                 {
                     if (!string.IsNullOrWhiteSpace(dispatchOutgoingMessage))
                     {
@@ -6381,9 +6481,15 @@ namespace Virexa.FMS
                     if (FMSFleetMessenger.Instance != null)
                     {
                         if (!FMSFleetMessenger.Instance.isTalkbackActive)
+                        {
                             FMSFleetMessenger.Instance.StartTalkback(dispatchSelectedUnitTarget);
+                            ShowNotification($"🎙️ [TALKBACK DISPATCH ON-AIR] Mengudara ke: {dispatchSelectedUnitTarget}");
+                        }
                         else
+                        {
                             FMSFleetMessenger.Instance.StopTalkback();
+                            ShowNotification("🎙️ [TALKBACK SELESAI] Transmisi suara diakhiri.");
+                        }
                     }
                 }
                 GUI.color = prevGuiColor;
@@ -7809,198 +7915,397 @@ namespace Virexa.FMS
             }
         }
 
+        // =========================================================================
+        // --- FUTURISTIC PROCEDURAL DRAWING HELPERS FOR BOOT SPLASH & HUD ---
+        // =========================================================================
+
+        private static void DrawGuiLine(Vector2 pointA, Vector2 pointB, Color color, float width)
+        {
+            Color savedColor = GUI.color;
+            Matrix4x4 savedMatrix = GUI.matrix;
+
+            GUI.color = color;
+            float angle = Vector2.SignedAngle(Vector2.right, pointB - pointA);
+            float length = Vector2.Distance(pointA, pointB);
+
+            GUIUtility.RotateAroundPivot(angle, pointA);
+            GUI.DrawTexture(new Rect(pointA.x, pointA.y - width * 0.5f, length, width), Texture2D.whiteTexture);
+
+            GUI.matrix = savedMatrix;
+            GUI.color = savedColor;
+        }
+
+        private static void DrawGuiBoxOutline(Rect rect, Color color, float thickness)
+        {
+            GUI.color = color;
+            GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, thickness), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(rect.x, rect.y + rect.height - thickness, rect.width, thickness), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(rect.x, rect.y, thickness, rect.height), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(rect.x + rect.width - thickness, rect.y, thickness, rect.height), Texture2D.whiteTexture);
+        }
+
+        private static void DrawCornerBracket(float x, float y, float w, float h, Color color, float thick, bool isTop, bool isLeft)
+        {
+            float cornerLen = Mathf.Min(w, h) * 0.35f;
+            float hX = isLeft ? x : x + w - cornerLen;
+            float hY = isTop ? y : y + h - thick;
+            float vX = isLeft ? x : x + w - thick;
+            float vY = isTop ? y : y + h - cornerLen;
+
+            GUI.color = color;
+            GUI.DrawTexture(new Rect(hX, hY, cornerLen, thick), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(vX, vY, thick, cornerLen), Texture2D.whiteTexture);
+        }
+
+        private static void DrawCyberHexagon(Vector2 center, float radius, float angleDeg, Color color, float thickness)
+        {
+            Vector2[] points = new Vector2[6];
+            for (int i = 0; i < 6; i++)
+            {
+                float rad = (angleDeg + i * 60f) * Mathf.Deg2Rad;
+                points[i] = new Vector2(center.x + radius * Mathf.Cos(rad), center.y + radius * Mathf.Sin(rad));
+            }
+            for (int i = 0; i < 6; i++)
+            {
+                Vector2 pNext = points[(i + 1) % 6];
+                DrawGuiLine(points[i], pNext, color, thickness);
+            }
+        }
+
+        private static void DrawProceduralCyberLogo(Vector2 center, float size)
+        {
+            float time = Time.realtimeSinceStartup;
+            float radius = size * 0.5f;
+
+            Color cyanNeon = new Color(0f, 0.90f, 1f, 0.95f);
+            Color emeraldNeon = new Color(0.12f, 0.88f, 0.54f, 0.95f);
+            Color dimCyan = new Color(0f, 0.85f, 1f, 0.25f);
+            Color glowWhite = new Color(1f, 1f, 1f, 0.90f);
+
+            // 1. Concentric Outer Orbital Arcs (Counter-Clockwise)
+            float outerAngle = -time * 50f;
+            int arcSegments = 8;
+            for (int a = 0; a < 4; a++)
+            {
+                float baseArc = outerAngle + a * 90f;
+                for (int s = 0; s < arcSegments; s++)
+                {
+                    float deg1 = baseArc + s * (70f / arcSegments);
+                    float deg2 = baseArc + (s + 1) * (70f / arcSegments);
+                    Vector2 p1 = center + new Vector2(Mathf.Cos(deg1 * Mathf.Deg2Rad), Mathf.Sin(deg1 * Mathf.Deg2Rad)) * (radius * 0.95f);
+                    Vector2 p2 = center + new Vector2(Mathf.Cos(deg2 * Mathf.Deg2Rad), Mathf.Sin(deg2 * Mathf.Deg2Rad)) * (radius * 0.95f);
+                    DrawGuiLine(p1, p2, dimCyan, 2.5f);
+                }
+            }
+
+            // 2. Outer Orbital Tick Markers (8 radial ticks)
+            for (int i = 0; i < 8; i++)
+            {
+                float tickDeg = (outerAngle + i * 45f) * Mathf.Deg2Rad;
+                Vector2 t1 = center + new Vector2(Mathf.Cos(tickDeg), Mathf.Sin(tickDeg)) * (radius * 0.88f);
+                Vector2 t2 = center + new Vector2(Mathf.Cos(tickDeg), Mathf.Sin(tickDeg)) * (radius * 0.99f);
+                DrawGuiLine(t1, t2, (i % 2 == 0) ? emeraldNeon : cyanNeon, 2.5f);
+            }
+
+            // 3. Inner Hexagonal Cyber Shield (Clockwise slow)
+            float hexAngle = time * 25f;
+            DrawCyberHexagon(center, radius * 0.74f, hexAngle, cyanNeon, 2.2f);
+            DrawCyberHexagon(center, radius * 0.68f, -hexAngle * 0.5f, new Color(0.12f, 0.88f, 0.54f, 0.35f), 1.2f);
+
+            // 4. Central Holographic 'V' Chevron Wings
+            float vW = size * 0.44f;
+            float vH = size * 0.48f;
+            float topY = center.y - vH * 0.46f;
+            float botY = center.y + vH * 0.44f;
+
+            // Left Chevron Arm
+            Vector2 l1 = new Vector2(center.x - vW * 0.55f, topY);
+            Vector2 l2 = new Vector2(center.x - vW * 0.16f, topY);
+            Vector2 l3 = new Vector2(center.x - vW * 0.02f, botY - vH * 0.22f);
+            Vector2 l4 = new Vector2(center.x - vW * 0.30f, botY - vH * 0.22f);
+            DrawGuiLine(l1, l2, cyanNeon, 3f);
+            DrawGuiLine(l2, l3, cyanNeon, 3f);
+            DrawGuiLine(l3, l4, cyanNeon, 3f);
+            DrawGuiLine(l4, l1, cyanNeon, 3f);
+
+            // Right Chevron Arm
+            Vector2 r1 = new Vector2(center.x + vW * 0.55f, topY);
+            Vector2 r2 = new Vector2(center.x + vW * 0.16f, topY);
+            Vector2 r3 = new Vector2(center.x + vW * 0.02f, botY - vH * 0.22f);
+            Vector2 r4 = new Vector2(center.x + vW * 0.30f, botY - vH * 0.22f);
+            DrawGuiLine(r1, r2, emeraldNeon, 3f);
+            DrawGuiLine(r2, r3, emeraldNeon, 3f);
+            DrawGuiLine(r3, r4, emeraldNeon, 3f);
+            DrawGuiLine(r4, r1, emeraldNeon, 3f);
+
+            // Apex Diamond Core
+            Vector2 dBot = new Vector2(center.x, botY);
+            Vector2 dLeft = new Vector2(center.x - vW * 0.20f, botY - vH * 0.28f);
+            Vector2 dTop = new Vector2(center.x, botY - vH * 0.52f);
+            Vector2 dRight = new Vector2(center.x + vW * 0.20f, botY - vH * 0.28f);
+            DrawGuiLine(dBot, dLeft, glowWhite, 2.5f);
+            DrawGuiLine(dLeft, dTop, glowWhite, 2.5f);
+            DrawGuiLine(dTop, dRight, glowWhite, 2.5f);
+            DrawGuiLine(dRight, dBot, glowWhite, 2.5f);
+
+            // 5. Sweeping Radar Line
+            float radarRad = (time * 120f) * Mathf.Deg2Rad;
+            Vector2 radarEnd = center + new Vector2(Mathf.Cos(radarRad), Mathf.Sin(radarRad)) * (radius * 0.65f);
+            DrawGuiLine(center, radarEnd, new Color(0f, 0.95f, 1f, 0.65f), 2f);
+
+            // 6. Central Telemetry Core Dot
+            GUI.color = glowWhite;
+            GUI.DrawTexture(new Rect(center.x - 3f, center.y - 3f, 6f, 6f), Texture2D.whiteTexture);
+        }
+
         private void DrawCleanBootSplashScreen(float screenW, float screenH)
         {
             Color oldColor = GUI.color;
-            if (bootSiteOrtho == null && siteId == "astha")
-            {
-                bootSiteOrtho = Resources.Load<Texture2D>("BootSiteOrtho");
-                autoLoadedSitePreview = bootSiteOrtho != null;
-            }
-            if (!bootLogoLoadAttempted)
-            {
-                bootLogoLoadAttempted = true;
-                if (siteId == "astha" && (companyLogo == null || companyLogo.name == "AsthaVirexaLogo"))
-                {
-                    TextAsset logoBytes = Resources.Load<TextAsset>("AsthaVirexaLogoRaw");
-                    if (logoBytes != null)
-                    {
-                        decodedCompanyLogo = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-                        if (ImageConversion.LoadImage(decodedCompanyLogo, logoBytes.bytes, true))
-                        {
-                            decodedCompanyLogo.filterMode = FilterMode.Bilinear;
-                            decodedCompanyLogo.wrapMode = TextureWrapMode.Clamp;
-                            companyLogo = decodedCompanyLogo;
-                        }
-                        else
-                        {
-                            Destroy(decodedCompanyLogo);
-                            decodedCompanyLogo = null;
-                        }
-                    }
-                    if (companyLogo == null) companyLogo = Resources.Load<Texture2D>("AsthaVirexaLogo");
-                    autoLoadedCompanyLogo = companyLogo != null;
-                }
-            }
-            if (bootSiteOrtho != null)
-            {
-                GUI.color = Color.white;
-                GUI.DrawTexture(new Rect(0f, 0f, screenW, screenH), bootSiteOrtho, ScaleMode.ScaleAndCrop);
-            }
-            GUI.color = new Color(0.035f, 0.065f, 0.068f, bootSiteOrtho != null ? 0.82f : 1f);
+
+            // 1. Futuristic Dark Cyber Backdrop
+            GUI.color = new Color(0.015f, 0.040f, 0.070f, 1f);
             GUI.DrawTexture(new Rect(0f, 0f, screenW, screenH), Texture2D.whiteTexture);
-            GUI.color = oldColor;
 
-            float contentW = Mathf.Min(640f, screenW - 40f);
-            float x = (screenW - contentW) * 0.5f;
-            float top = Mathf.Max(28f, (screenH - 400f) * 0.5f);
-            Color textColor = new Color(0.96f, 0.98f, 0.97f);
-            Color mutedColor = new Color(0.70f, 0.77f, 0.76f);
-            Color accentColor = new Color(0.32f, 0.82f, 0.70f);
-            Color warningColor = new Color(0.95f, 0.68f, 0.30f);
-            bool compactIdentity = x < 270f;
-            float logoSize = compactIdentity ? 88f : Mathf.Min(320f, x - 48f);
-            Rect logoRect = compactIdentity
-                ? new Rect(x, top + 4f, logoSize, logoSize)
-                : new Rect(x - logoSize - 28f, top - 12f, logoSize, logoSize);
-            if (companyLogo != null)
+            // 2. Ambient Cyber Grid Background (Subtle glowing lines)
+            float gridSpacing = 48f;
+            Color gridColor = new Color(0f, 0.85f, 1f, 0.035f);
+            for (float gx = 0; gx < screenW; gx += gridSpacing)
             {
-                GUI.color = Color.white;
-                GUI.DrawTexture(logoRect, companyLogo, ScaleMode.ScaleToFit, false);
-                GUI.color = oldColor;
+                GUI.color = gridColor;
+                GUI.DrawTexture(new Rect(gx, 0f, 1f, screenH), Texture2D.whiteTexture);
             }
-            else
+            for (float gy = 0; gy < screenH; gy += gridSpacing)
             {
-                GUIStyle logoPlaceholderStyle = new GUIStyle(GUI.skin.label)
-                {
-                    fontSize = compactIdentity ? 28 : 64,
-                    fontStyle = FontStyle.Bold,
-                    alignment = TextAnchor.MiddleCenter,
-                    normal = { textColor = accentColor }
-                };
-                GUI.color = Color.white;
-                GUI.Label(logoRect, "AV", logoPlaceholderStyle);
-                GUI.color = oldColor;
+                GUI.color = gridColor;
+                GUI.DrawTexture(new Rect(0f, gy, screenW, 1f), Texture2D.whiteTexture);
             }
 
-            float identityX = compactIdentity ? x + logoSize + 16f : x;
-            float identityW = compactIdentity ? contentW - logoSize - 16f : contentW;
+            // 3. Screen Corner Tech HUD Brackets & Telemetry Tags
+            float pad = 24f;
+            float bracketSize = 44f;
+            Color bracketColor = new Color(0f, 0.88f, 1f, 0.45f);
+            Color hudLabelColor = new Color(0.40f, 0.75f, 0.85f, 0.60f);
+            GUIStyle cornerLabelStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 10,
+                fontStyle = FontStyle.Bold,
+                normal = { textColor = hudLabelColor }
+            };
 
+            // Top-Left Bracket
+            DrawCornerBracket(pad, pad, bracketSize, bracketSize, bracketColor, 2f, true, true);
+            GUI.Label(new Rect(pad + 12f, pad + 4f, 260f, 20f), "SYS // ASTHA-VIREXA-FMS // ONLINE", cornerLabelStyle);
+
+            // Top-Right Bracket
+            DrawCornerBracket(screenW - pad - bracketSize, pad, bracketSize, bracketSize, bracketColor, 2f, true, false);
+            cornerLabelStyle.alignment = TextAnchor.UpperRight;
+            GUI.Label(new Rect(screenW - pad - 272f, pad + 4f, 260f, 20f), "NODE // SECURE WEBSOCKET 8000", cornerLabelStyle);
+
+            // Bottom-Left Bracket
+            DrawCornerBracket(pad, screenH - pad - bracketSize, bracketSize, bracketSize, bracketColor, 2f, false, true);
+            cornerLabelStyle.alignment = TextAnchor.LowerLeft;
+            GUI.Label(new Rect(pad + 12f, screenH - pad - 24f, 280f, 20f), "GEO // LAT: -0.8524° | LON: 117.2341°", cornerLabelStyle);
+
+            // Bottom-Right Bracket
+            DrawCornerBracket(screenW - pad - bracketSize, screenH - pad - bracketSize, bracketSize, bracketSize, bracketColor, 2f, false, false);
+            cornerLabelStyle.alignment = TextAnchor.LowerRight;
+            GUI.Label(new Rect(screenW - pad - 272f, screenH - pad - 24f, 260f, 20f), "ASTHA MINING OPERATIONS HUB", cornerLabelStyle);
+
+            // 4. Center Main Content Dimensions
+            float contentW = Mathf.Min(680f, screenW - 48f);
+            float centerX = screenW * 0.5f;
+            float topY = Mathf.Max(32f, (screenH - 580f) * 0.5f);
+
+            // 5. Draw Procedural Holographic Logo Emblem (Centered)
+            float logoSize = 120f;
+            Vector2 emblemCenter = new Vector2(centerX, topY + logoSize * 0.5f);
+            DrawProceduralCyberLogo(emblemCenter, logoSize);
+
+            // 6. Centered Title & Brand Hierarchy
+            float textY = topY + logoSize + 16f;
+
+            // Eyebrow Tag Pill
             GUIStyle eyebrowStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = compactIdentity ? 10 : 12,
+                fontSize = 11,
                 fontStyle = FontStyle.Bold,
-                normal = { textColor = accentColor }
+                alignment = TextAnchor.MiddleCenter,
+                normal = { textColor = new Color(0.12f, 0.90f, 0.60f) }
             };
-            float nameWidth = eyebrowStyle.CalcSize(new GUIContent(companyDisplayName)).x;
-            if (nameWidth > identityW)
-                eyebrowStyle.fontSize = Mathf.Max(8, Mathf.FloorToInt(eyebrowStyle.fontSize * identityW / nameWidth));
-            GUI.Label(new Rect(identityX, top, identityW, 22f), companyDisplayName, eyebrowStyle);
+            GUI.Label(new Rect(centerX - 220f, textY, 440f, 20f), "[ ASTHA VIREXA ENTERPRISE FMS PLATFORM ]", eyebrowStyle);
 
+            // Main Brand Title
             GUIStyle brandStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = compactIdentity ? Mathf.Min(27, Mathf.FloorToInt(identityW / 8f)) : 48,
+                fontSize = 42,
                 fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.MiddleLeft,
+                alignment = TextAnchor.MiddleCenter,
                 richText = true,
-                normal = { textColor = textColor }
+                normal = { textColor = Color.white }
             };
-            GUI.Label(new Rect(identityX, top + 24f, identityW, 62f), "VIREXA <color=#52D1B2>ONE</color>", brandStyle);
+            GUI.Label(new Rect(centerX - 250f, textY + 22f, 500f, 52f), "VIREXA <color=#00E5FF>ONE</color>", brandStyle);
 
-            GUIStyle subtitleStyle = new GUIStyle(GUI.skin.label)
+            // Subtitle
+            GUIStyle subStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = compactIdentity ? 12 : 15,
-                alignment = TextAnchor.MiddleLeft,
-                normal = { textColor = mutedColor }
+                fontSize = 14,
+                alignment = TextAnchor.MiddleCenter,
+                normal = { textColor = new Color(0.65f, 0.78f, 0.88f, 0.85f) }
             };
-            GUI.Label(new Rect(identityX, top + 90f, identityW, 26f), "Ruang kendali operasi tambang", subtitleStyle);
+            GUI.Label(new Rect(centerX - 250f, textY + 76f, 500f, 24f), "Autonomous Fleet & Mining Operations Command Console", subStyle);
 
+            // 7. Glassmorphic Console Card (Centered Box)
+            float cardY = textY + 112f;
+            float cardW = contentW;
+            float cardH = 220f;
+            float cardX = (screenW - cardW) * 0.5f;
+            Rect cardRect = new Rect(cardX, cardY, cardW, cardH);
+
+            // Card Background Fill & Neon Border
+            GUI.color = new Color(0.035f, 0.090f, 0.150f, 0.92f);
+            GUI.DrawTexture(cardRect, Texture2D.whiteTexture);
+            DrawGuiBoxOutline(cardRect, new Color(0f, 0.85f, 1f, 0.40f), 1.5f);
+            DrawCornerBracket(cardX, cardY, 20f, 20f, new Color(0f, 0.95f, 1f, 0.9f), 2f, true, true);
+            DrawCornerBracket(cardX + cardW - 20f, cardY, 20f, 20f, new Color(0f, 0.95f, 1f, 0.9f), 2f, true, false);
+            DrawCornerBracket(cardX, cardY + cardH - 20f, 20f, 20f, new Color(0.12f, 0.90f, 0.60f, 0.9f), 2f, false, true);
+            DrawCornerBracket(cardX + cardW - 20f, cardY + cardH - 20f, 20f, 20f, new Color(0.12f, 0.90f, 0.60f, 0.9f), 2f, false, false);
+            GUI.color = oldColor;
+
+            // State Evaluation
             bool connected = bootApiState == BootApiProbeState.Connected;
             bool feedStale = FMSFleetManager.Instance == null || FMSFleetManager.Instance.isTelemetryFeedStale;
             bool failed = bootApiState == BootApiProbeState.FailedTimeout;
             bool ready = (connected || bootApiState == BootApiProbeState.OfflineBypassed) && bootProgress >= 0.98f;
-            string phase = failed ? "Telemetri belum tersedia"
-                : bootProgress < 0.43f ? "Menyiapkan peta operasi"
-                : bootProgress < 0.68f ? "Memuat area tambang"
-                : bootProgress < 0.98f ? "Menyiapkan armada"
-                : "Ruang kendali siap";
+            string phase = failed ? "⚡ Koneksi Telemetri Backend Belum Siap"
+                : bootProgress < 0.43f ? "⚡ Menginisialisasi Peta & Terrain 3D Operasi..."
+                : bootProgress < 0.68f ? "⚡ Memuat Boundary & Sektor Tambang..."
+                : bootProgress < 0.98f ? "⚡ Menyiapkan Armada GPS & Jalur Dispatch..."
+                : "✔ Ruang Kendali Operasi Siap Diaktifkan";
 
+            // Phase Readout & Live Percentage
             GUIStyle phaseStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = 14,
+                fontSize = 13,
                 fontStyle = FontStyle.Bold,
-                normal = { textColor = textColor }
+                alignment = TextAnchor.MiddleLeft,
+                normal = { textColor = ready ? new Color(0.12f, 0.90f, 0.60f) : new Color(0.92f, 0.97f, 1f) }
             };
-            GUIStyle percentStyle = new GUIStyle(phaseStyle)
+            GUIStyle percentStyle = new GUIStyle(GUI.skin.label)
             {
+                fontSize = 13,
+                fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleRight,
-                normal = { textColor = mutedColor }
+                normal = { textColor = new Color(0f, 0.90f, 1f) }
             };
-            float progressY = top + 168f;
-            GUI.Label(new Rect(x, progressY, contentW - 70f, 20f), phase, phaseStyle);
-            GUI.Label(new Rect(x + contentW - 70f, progressY, 70f, 20f),
-                $"{Mathf.RoundToInt(bootProgress * 100f)}%", percentStyle);
 
-            float barY = progressY + 32f;
-            GUI.color = new Color(0.27f, 0.35f, 0.34f);
-            GUI.DrawTexture(new Rect(x, barY, contentW, 5f), Texture2D.whiteTexture);
-            float fillW = contentW * Mathf.Clamp01(bootProgress);
-            GUI.color = failed ? warningColor : accentColor;
-            if (fillW > 0f) GUI.DrawTexture(new Rect(x, barY, fillW, 5f), Texture2D.whiteTexture);
+            float innerPad = 22f;
+            float innerY = cardY + 18f;
+            float innerW = cardW - (innerPad * 2f);
+
+            GUI.Label(new Rect(cardX + innerPad, innerY, innerW - 80f, 22f), phase, phaseStyle);
+            GUI.Label(new Rect(cardX + cardW - innerPad - 80f, innerY, 80f, 22f), $"{Mathf.RoundToInt(bootProgress * 100f)}%", percentStyle);
+
+            // Glowing Dual-Tone Progress Bar
+            float barY = innerY + 28f;
+            float barH = 7f;
+            GUI.color = new Color(0.08f, 0.18f, 0.28f, 0.8f);
+            GUI.DrawTexture(new Rect(cardX + innerPad, barY, innerW, barH), Texture2D.whiteTexture);
+
+            float fillW = innerW * Mathf.Clamp01(bootProgress);
+            GUI.color = failed ? new Color(0.95f, 0.65f, 0.25f) : new Color(0f, 0.88f, 1f);
+            if (fillW > 0f)
+            {
+                GUI.DrawTexture(new Rect(cardX + innerPad, barY, fillW, barH), Texture2D.whiteTexture);
+                GUI.color = Color.white;
+                GUI.DrawTexture(new Rect(cardX + innerPad + Mathf.Max(0f, fillW - 8f), barY, 8f, barH), Texture2D.whiteTexture);
+            }
             GUI.color = oldColor;
 
-            GUIStyle statusStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 12,
-                alignment = TextAnchor.MiddleLeft,
-                normal = { textColor = mutedColor }
-            };
-            float statusY = barY + 27f;
-            float statusW = contentW / 3f;
+            // 8. 3 Subsystem Status Badges (Terrain 3D, GPS Fleet, WebSocket)
+            float subStatusY = barY + 22f;
+            float colW = innerW / 3f;
             bool mapReady = FMSMining3DLayer.Instance != null && FMSMining3DLayer.Instance.isLoaded;
-            bool fleetReady = FMSFleetManager.Instance != null;
-            string[] statusTexts = { "Peta area", "Armada", "Telemetri" };
-            Color[] statusColors = {
-                mapReady ? accentColor : mutedColor,
-                fleetReady ? accentColor : mutedColor,
-                connected ? (feedStale ? warningColor : accentColor) : failed ? warningColor : mutedColor
+            bool fleetReady = FMSFleetManager.Instance != null && FMSFleetManager.Instance.activeFleet != null;
+
+            string[] subTitles = { "🌐 TERRAIN 3D LAYER", "🛰️ GPS FLEET MESH", "📡 TELEMETRI RT" };
+            string[] subStates = {
+                mapReady ? "AKTIF / READY" : "MEMUAT...",
+                fleetReady ? "205 UNIT ONLINE" : "MENGHUBUNGKAN...",
+                connected ? (feedStale ? "FALLBACK BUFFER" : "LIVE WS 8000") : failed ? "OFFLINE" : "PROBING..."
             };
-            for (int i = 0; i < statusTexts.Length; i++)
+            Color[] subColors = {
+                mapReady ? new Color(0.12f, 0.90f, 0.60f) : new Color(0.5f, 0.7f, 0.8f),
+                fleetReady ? new Color(0.12f, 0.90f, 0.60f) : new Color(0.5f, 0.7f, 0.8f),
+                connected ? (feedStale ? new Color(0.95f, 0.70f, 0.25f) : new Color(0.12f, 0.90f, 0.60f)) : failed ? new Color(0.95f, 0.40f, 0.40f) : new Color(0.5f, 0.7f, 0.8f)
+            };
+
+            GUIStyle podHeaderStyle = new GUIStyle(GUI.skin.label)
             {
-                float itemX = x + statusW * i;
-                GUI.color = statusColors[i];
-                GUI.DrawTexture(new Rect(itemX, statusY + 7f, 6f, 6f), Texture2D.whiteTexture);
+                fontSize = 10,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleLeft,
+                normal = { textColor = new Color(0.50f, 0.75f, 0.85f) }
+            };
+            GUIStyle podValueStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 11,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleLeft
+            };
+
+            for (int i = 0; i < 3; i++)
+            {
+                float colX = cardX + innerPad + (i * colW);
+                Rect podRect = new Rect(colX + 2f, subStatusY, colW - 6f, 46f);
+                GUI.color = new Color(0.05f, 0.12f, 0.20f, 0.75f);
+                GUI.DrawTexture(podRect, Texture2D.whiteTexture);
+                DrawGuiBoxOutline(podRect, new Color(subColors[i].r, subColors[i].g, subColors[i].b, 0.35f), 1f);
+
+                GUI.color = subColors[i];
+                GUI.DrawTexture(new Rect(colX + 10f, subStatusY + 12f, 6f, 6f), Texture2D.whiteTexture);
                 GUI.color = oldColor;
-                GUI.Label(new Rect(itemX + 13f, statusY, statusW - 13f, 20f), statusTexts[i], statusStyle);
+
+                GUI.Label(new Rect(colX + 20f, subStatusY + 6f, colW - 28f, 16f), subTitles[i], podHeaderStyle);
+                podValueStyle.normal.textColor = subColors[i];
+                GUI.Label(new Rect(colX + 20f, subStatusY + 22f, colW - 28f, 18f), subStates[i], podValueStyle);
             }
 
+            // Connection Diagnostic Hint Note
             string connectionNote = connected
-                ? feedStale ? "Pembaruan GPS tertunda. Peta tetap tersedia." : "Data operasional terhubung."
-                : failed ? "Koneksi data belum tersedia. Peta tetap dapat dibuka."
-                : "Menyambungkan data operasional...";
+                ? feedStale ? "ℹ️ Pembaruan GPS telemetri menggunakan local buffer. Seluruh peta & fleet tetap siap dioperasikan." : "✔ Seluruh saluran telemetri terhubung optimal dengan latensi rendah."
+                : failed ? "⚠️ Backend telemetri belum merespons. Anda tetap dapat masuk menggunakan peta & cache offline."
+                : "⏳ Menguji integritas koneksi telemetri dan endpoint API FMS...";
             GUIStyle noteStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = 12,
+                fontSize = 11,
                 alignment = TextAnchor.MiddleLeft,
-                normal = { textColor = (connected && feedStale) || failed ? warningColor : mutedColor }
+                normal = { textColor = failed ? new Color(0.95f, 0.70f, 0.30f) : new Color(0.55f, 0.75f, 0.85f, 0.8f) }
             };
-            GUI.Label(new Rect(x, statusY + 40f, contentW, 26f), connectionNote, noteStyle);
+            GUI.Label(new Rect(cardX + innerPad, subStatusY + 54f, innerW, 24f), connectionNote, noteStyle);
 
-            float buttonY = statusY + 84f;
-            GUIStyle actionStyle = new GUIStyle(GUI.skin.label)
+            // 9. Cyber Action Buttons
+            float actionBtnY = cardY + cardH + 20f;
+            float btnW = Mathf.Min(340f, cardW);
+            float btnX = centerX - (btnW * 0.5f);
+            float btnH = 48f;
+
+            GUIStyle cyberActionBtnStyle = new GUIStyle(GUI.skin.button)
             {
-                fontSize = 14,
+                fontSize = 13,
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter,
-                border = new RectOffset(0, 0, 0, 0),
-                normal = { background = bootPrimaryButtonTex, textColor = new Color(0.035f, 0.11f, 0.105f) },
-                hover = { background = bootPrimaryButtonHoverTex, textColor = new Color(0.035f, 0.11f, 0.105f) },
-                active = { background = bootPrimaryButtonHoverTex, textColor = new Color(0.035f, 0.11f, 0.105f) }
+                normal = { textColor = new Color(0.02f, 0.08f, 0.12f) }
             };
+
             if (ready)
             {
-                float buttonW = Mathf.Min(240f, contentW);
-                if (GUI.Button(new Rect(x, buttonY, buttonW, 46f), "Masuk ke peta operasi", actionStyle))
+                Rect btnRect = new Rect(btnX, actionBtnY, btnW, btnH);
+                GUI.color = new Color(0f, 0.95f, 0.75f);
+                GUI.DrawTexture(btnRect, Texture2D.whiteTexture);
+                DrawGuiBoxOutline(btnRect, Color.white, 2f);
+                GUI.color = oldColor;
+
+                if (GUI.Button(btnRect, "MASUK KE RUANG KENDALI OPERASI  ➔", cyberActionBtnStyle))
                 {
                     bootProgress = 1f;
                     isBooting = false;
@@ -8008,30 +8313,50 @@ namespace Virexa.FMS
             }
             else if (failed)
             {
-                float gap = 12f;
-                bool stackedButtons = contentW < 450f;
-                float buttonW = stackedButtons ? contentW : (contentW - gap) * 0.5f;
-                if (GUI.Button(new Rect(x, buttonY, buttonW, 46f), "Coba lagi", actionStyle))
+                float halfBtnW = (btnW - 12f) * 0.5f;
+                Rect retryRect = new Rect(centerX - btnW * 0.5f, actionBtnY, halfBtnW, btnH);
+                Rect offlineRect = new Rect(centerX - btnW * 0.5f + halfBtnW + 12f, actionBtnY, halfBtnW, btnH);
+
+                GUI.color = new Color(0f, 0.88f, 1f);
+                GUI.DrawTexture(retryRect, Texture2D.whiteTexture);
+                GUI.color = oldColor;
+                if (GUI.Button(retryRect, "🔄 Coba Ulang", cyberActionBtnStyle))
                 {
                     RetryApiConnection();
                     bootTimer = 0f;
                     bootApiState = BootApiProbeState.Probing;
                 }
 
-                GUIStyle secondaryStyle = new GUIStyle(actionStyle)
+                GUI.color = new Color(0.15f, 0.28f, 0.38f);
+                GUI.DrawTexture(offlineRect, Texture2D.whiteTexture);
+                GUI.color = oldColor;
+                GUIStyle offlineBtnStyle = new GUIStyle(cyberActionBtnStyle)
                 {
-                    normal = { background = bootSecondaryButtonTex, textColor = textColor },
-                    hover = { background = bootSecondaryButtonTex, textColor = textColor },
-                    active = { background = bootSecondaryButtonTex, textColor = textColor }
+                    normal = { textColor = Color.white }
                 };
-                float secondaryX = stackedButtons ? x : x + buttonW + gap;
-                float secondaryY = stackedButtons ? buttonY + 46f + gap : buttonY;
-                if (GUI.Button(new Rect(secondaryX, secondaryY, buttonW, 46f), "Buka tanpa telemetri", secondaryStyle))
+                if (GUI.Button(offlineRect, "Buka Mode Offline", offlineBtnStyle))
                 {
                     bootApiState = BootApiProbeState.OfflineBypassed;
                     bootProgress = 1f;
                     isBooting = false;
                 }
+            }
+            else
+            {
+                Rect btnRect = new Rect(btnX, actionBtnY, btnW, btnH);
+                GUI.color = new Color(0.08f, 0.20f, 0.30f, 0.7f);
+                GUI.DrawTexture(btnRect, Texture2D.whiteTexture);
+                DrawGuiBoxOutline(btnRect, new Color(0f, 0.85f, 1f, 0.35f), 1f);
+                GUI.color = oldColor;
+
+                GUIStyle bootingBtnStyle = new GUIStyle(GUI.skin.label)
+                {
+                    fontSize = 12,
+                    fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter,
+                    normal = { textColor = new Color(0.45f, 0.75f, 0.85f) }
+                };
+                GUI.Label(btnRect, "MEMPERSIAPKAN RUANG KENDALI...", bootingBtnStyle);
             }
         }
 
